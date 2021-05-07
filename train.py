@@ -3,12 +3,16 @@ import numpy as np
 import math
 import datetime
 import argparse
+import os
 from sesa_pointnet import SeSaPointNet
 
 
-def loss(seg_pred, seg, t, reg_f=1e-3):
+def get_loss(seg_pred, seg, t, reg_f=1e-3, check_numerics=True):
+    seg = seg.astype(np.int32)
     ce = tf.nn.sparse_softmax_cross_entropy_with_logits(
                     labels=seg, logits=seg_pred)
+    if check_numerics:
+        ce = tf.debugging.check_numerics(ce, "ce")
 
     per_instance_seg_loss = tf.reduce_mean(ce, axis=1)
     seg_loss = tf.reduce_mean(per_instance_seg_loss)
@@ -16,25 +20,32 @@ def loss(seg_pred, seg, t, reg_f=1e-3):
     K = tf.shape(t)[1]
     mat_diff = tf.matmul(t, tf.transpose(t, perm=[0,2,1])) - tf.constant(np.eye(K), dtype=tf.float32)
     mat_diff_loss = tf.nn.l2_loss(mat_diff)
+    if check_numerics:
+        mat_diff_loss = tf.debugging.check_numerics(mat_diff_loss, "mat_diff_loss")
 
-    total = seg_loss + mat_diff_loss * reg_f 
+    total = seg_loss + mat_diff_loss * reg_f
     return total, seg_loss, mat_diff_loss
 
 
 def load_block(block_dir, name):
-    filename = block_dir + str(name) + ".npz"
+    filename = block_dir + "/" + str(name) + ".npz"
     data = np.load(filename)
     block = data["block"]
     b_labels = data["labels"]
+
+    max_block = np.max(np.abs(block[:, :3]))
+    block[:, :3] /= max_block
+
     return block, b_labels
 
 
-def load_batch(i, train_idxs, block_dir, blocks, labels):
+def load_batch(i, train_idxs, block_dir, blocks, labels, batch_size):
     j = i * batch_size
     idxs = train_idxs[j:j+batch_size]
     for k in range(idxs.shape[0]):
         name = idxs[k]
         block, b_labels = load_block(block_dir, name)
+        b_labels = np.squeeze(b_labels, -1)
         blocks[k] = block
         labels[k] = b_labels
     return blocks, labels
@@ -48,6 +59,7 @@ def main():
     parser.add_argument("--global_norm_t", type=float, default=1, help="Training global norm threshold.")
     parser.add_argument("--test_interval", type=int, default=10, help="Interval to test the model.")
     parser.add_argument("--max_epoch", type=int, default=200, help="Number of epochs.")
+    parser.add_argument("--n_classes", type=int, default=13, help="Number of classes.")
     parser.add_argument("--initializer", type=str, default="glorot_uniform", help="Initializer of the weights.")
     parser.add_argument("--check_numerics", type=bool, default=False, help="Should NaN or Inf values be checked.")
     args = parser.parse_args()
@@ -57,26 +69,28 @@ def main():
     learning_rate = args.learning_rate
     global_norm_t = args.global_norm_t
     test_interval = args.test_interval
-    block_dir = "blocks"
+    block_dir = "Blocks"
+    n_classes = args.n_classes
     np.random.seed(seed)
-    
+
     block_dirs = os.listdir(block_dir)
-    all_idxs = np.arange(block_dirs, np.int32)
+    all_idxs = np.arange(len(block_dirs)).astype(np.int32)
     train_p = 0.8
     train_n = math.floor(train_p * len(all_idxs))
     test_n = len(all_idxs) - train_n
+    print("Use {0} blocks for training and {1} blocks for testing".format(train_n, test_n))
     train_idxs = np.random.choice(all_idxs, size=train_n, replace=False)
     test_idxs = np.delete(all_idxs, train_idxs)
     np.random.shuffle(train_idxs)
-    
+
     n_batches = math.floor(train_n / batch_size)
-    
+
     n_epoch = 0
     max_epoch = args.max_epoch
 
     b, l = load_block(block_dir, 0)
     blocks = np.zeros((batch_size, ) + b.shape, np.float32)
-    labels = np.zeros((batch_size, ), np.uint8)
+    labels = np.zeros((batch_size, ) + (l.shape[0], ), np.uint8)
 
     net = SeSaPointNet(
         name="SeSaPN",
@@ -92,13 +106,13 @@ def main():
     train_summary_writer = tf.summary.create_file_writer(log_dir)
     train_step = 0
     test_step = 0
-    
+
     while n_epoch < max_epoch:
         for i in range(n_batches):
             with tf.GradientTape() as tape:
-                blocks, labels = load_batch(i, train_idxs, block_dir, blocks, labels)
+                blocks, labels = load_batch(i, train_idxs, block_dir, blocks, labels, batch_size)
                 t, pred = net(blocks)
-                loss, seg_loss, mat_diff_loss = loss(seg_pred=pred, seg=labels, t=t)
+                loss, seg_loss, mat_diff_loss = get_loss(seg_pred=pred, seg=labels, t=t)
                 vars_ = tape.watched_variables()
                 grads = tape.gradient(loss, vars_)
                 global_norm = tf.linalg.global_norm(grads)

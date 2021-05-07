@@ -1,7 +1,7 @@
 import argparse
 import os
 import numpy as np
-from utils import mkdir, file_exists, render_point_cloud
+from utils import mkdir, file_exists, render_point_cloud, room2blocks
 
 
 def get_special_objects():
@@ -19,6 +19,22 @@ def get_special_objects():
         special_objects[obj] = i + 1
     special_objects["floor"] = special_objects["wall"]
     return special_objects
+
+
+def create_blocks(num_points=4096):
+    mkdir("./Blocks")
+    scenes = os.listdir("./S3DIS_Scenes")
+    block_n = 0
+    for i in range(len(scenes)):
+        scene = scenes[i]
+        P, labels = load_scene(scene)
+        blocks, b_labels = room2blocks(data=P, label=labels, num_point=num_points)
+        for k in range(blocks.shape[0]):
+            block = blocks[k]
+            b_label = b_labels[k]
+            np.savez("./Blocks/" + str(block_n) + ".npz", block=block, labels=b_label)
+            block_n += 1
+    print(block_n, "Blocks saved.")
 
 
 def prepare_scenes(dataset_name):
@@ -126,6 +142,7 @@ def load_scene(scene):
     labels = data["labels"]
     return P, labels
 
+
 def main():
     """Program entry point. """
     parser = argparse.ArgumentParser()
@@ -159,6 +176,11 @@ def main():
         type=bool,
         default=False,
         help="If True, the point cloud will be animated")
+    parser.add_argument(
+        "--num_points",
+        type=int,
+        default=4096,
+        help="Number of points per block")
     args = parser.parse_args()
     print(args)
     print("mode:", args.mode)
@@ -169,6 +191,8 @@ def main():
         render_point_cloud(P=P, animate=args.animate)
         render_point_cloud(
             P=P, partition_vec=labels, animate=args.animate)
+    elif args.mode == "blocks":
+        create_blocks(num_points=args.num_points)
     else:
         prepare_scenes("s3dis")
         if args.mode != "visualize_all":
@@ -176,8 +200,8 @@ def main():
         scenes = os.listdir("./S3DIS_Scenes")
         for i in range(len(scenes)):
             scene = scenes[i]
-            P, labels = load_scene(args.scene)
-            print(id, P.shape, labels.shape, "progress:", i, "/", len(scenes))
+            P, labels = load_scene(scene)
+            print(scene, P.shape, labels.shape, "progress:", i, "/", len(scenes))
             render_point_cloud(P=P, animate=args.animate)
             render_point_cloud(
                 P=P, partition_vec=partition_vec, animate=args.animate)

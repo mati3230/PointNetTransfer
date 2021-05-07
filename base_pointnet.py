@@ -12,15 +12,15 @@ class PointNet(BaseNet):
             seed=None,
             check_numerics=False,
             initializer="glorot_uniform",
-            n_points=1024):
+            n_points=4096):
         super().__init__(
             name=name,
             trainable=trainable,
             seed=seed,
-            stateful=False,
+            check_numerics=check_numerics,
             initializer=initializer)
         self.n_points = n_points
-        
+
         self.bn1g = BatchNormalization(name=name+"/bn1g")
         self.bn2g = BatchNormalization(name=name+"/bn2g")
         self.bn3g = BatchNormalization(name=name+"/bn3g")
@@ -32,14 +32,14 @@ class PointNet(BaseNet):
         self.bn3itn = BatchNormalization(name=name+"/bn3itn")
         self.bn4itn = BatchNormalization(name=name+"/bn4itn")
         self.bn5itn = BatchNormalization(name=name+"/bn5itn")
-        
+
         self.bn1ftn = BatchNormalization(name=name+"/bn1ftn")
         self.bn2ftn = BatchNormalization(name=name+"/bn2ftn")
         self.bn3ftn = BatchNormalization(name=name+"/bn3ftn")
         self.bn4ftn = BatchNormalization(name=name+"/bn4ftn")
         self.bn5ftn = BatchNormalization(name=name+"/bn5ftn")
         self.bn6ftn = BatchNormalization(name=name+"/bn6ftn")
-        
+
         self.c1itn = Conv2D(
             filters=64,
             kernel_size=[1, 6],
@@ -161,10 +161,13 @@ class PointNet(BaseNet):
 
     def input_t_net(self, input_points):
         # input_Transformation_net
+        #print(input_points.shape)
         x = tf.expand_dims(input_points, -1)
+        #print(x.shape)
         x = self.c1itn(x)
         #print(x.shape)
         x=tf.squeeze(x, axis=2)
+        #print(x.shape)
         x = self.bn1itn(x)
         #print(x.shape)
         x = self.c2itn(x)
@@ -196,9 +199,9 @@ class PointNet(BaseNet):
         #print(input_T.shape)
 
         # forward net
-        g = tf.matmul(input_points, input_T)
+        input_T = tf.matmul(input_points, input_T)
         #print("G", g.shape)
-        g = self.c1g(g)
+        g = self.c1g(input_T)
         g = self.bn1g(g)
         #print(g.shape)
         g = self.c2g(g)
@@ -210,9 +213,9 @@ class PointNet(BaseNet):
         #print(feature_T.shape)
 
         # forward net
-        g = tf.matmul(g, feature_T)
-        #print("G", g.shape)
-        g = self.c3g(g)
+        feature_T = tf.matmul(g, feature_T)
+        # print("G", g.shape)
+        g = self.c3g(feature_T)
         g = self.bn3g(g)
         #print(g.shape)
         g = self.c4g(g)
@@ -228,6 +231,8 @@ class PointNet(BaseNet):
         #global_feature = self.d1g(global_feature)
         #global_feature = self.bn6g(global_feature)
         #global_feature = tf.squeeze(global_feature, axis=1)
+        if self.check_numerics:
+            global_feature = tf.debugging.check_numerics(global_feature, "global_feature")
         return input_T, feature_T, global_feature
 
     def reset(self):

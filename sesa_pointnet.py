@@ -1,5 +1,6 @@
 from base_classifier import BaseClassifier
 from base_pointnet import PointNet
+import tensorflow as tf
 from tensorflow.keras.layers import Conv1D, BatchNormalization
 
 class SeSaPointNet(BaseClassifier):
@@ -85,6 +86,7 @@ class SeSaPointNet(BaseClassifier):
 
     def __call__(self, obs):
         t, f, g = self.net(obs)
+        g = tf.tile(g, multiples=[1, tf.shape(f)[1], 1])
         x = tf.concat((f, g), axis=-1)
         x = self.c1(x)
         x = self.bn1(x)

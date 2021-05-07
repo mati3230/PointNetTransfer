@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from .utils import mkdir, file_exists
+from utils import mkdir, file_exists
 import numpy as np
 
 
@@ -23,8 +23,7 @@ class BaseClassifier(ABC):
             seed=seed,
             trainable=trainable,
             check_numerics=check_numerics,
-            initializer=initializer,
-            mode=mode)
+            initializer=initializer)
         self.init_variables(
             name=name,
             n_classes=n_classes,
