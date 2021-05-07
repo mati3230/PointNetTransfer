@@ -1,12 +1,11 @@
-from s3dis_provider import DataProvider
 import argparse
 import os
 import numpy as np
-from utils import mkdir, file_exists
+from utils import mkdir, file_exists, render_point_cloud
 
 
 def get_special_objects():
-    """Create a dictionary where explicit object names assigned to reseverd numbers. 
+    """Create a dictionary where explicit object names assigned to reseverd numbers.
 
     Returns
     -------
@@ -34,6 +33,26 @@ def prepare_scenes(dataset_name):
     s3dis_dir = os.environ["S3DIS_DIR"] + "/data"
     special_objects = get_special_objects()
 
+    obj_labels = {}
+    obj_label_nr = 0
+
+    for dir in os.listdir(s3dis_dir):
+        area_dir = s3dis_dir + "/" + dir
+        for scene in os.listdir(area_dir):
+            scene_dir = area_dir + "/" + scene + "/Annotations"
+            if not os.path.isdir(scene_dir):
+                continue
+            for obj_file in os.listdir(scene_dir):
+                if len(obj_file) <= 4:
+                    continue
+                if not obj_file.endswith(".txt"):
+                    continue
+                obj_name = obj_file.split("_")[0]
+                if obj_name not in obj_labels:
+                    obj_labels[obj_name] = obj_label_nr
+                    obj_label_nr += 1
+    print(obj_label_nr-1, "classes found")
+
     for dir in os.listdir(s3dis_dir):
         area_dir = s3dis_dir + "/" + dir
         for scene in os.listdir(area_dir):
@@ -48,6 +67,7 @@ def prepare_scenes(dataset_name):
             O = len(special_objects) + 1
             P = np.zeros((0, 6), np.float32)
             partition_vec = np.zeros((0, 1), np.int32)
+            label_vec = np.zeros((0, 1), np.uint8)
             mkdir(n_scene_dir)
             ok = True
             for obj_file in os.listdir(scene_dir):
@@ -55,6 +75,7 @@ def prepare_scenes(dataset_name):
                     continue
                 if not obj_file.endswith(".txt"):
                     continue
+                obj_name = obj_file.split("_")[0]
                 obj_dir = scene_dir + "/" + obj_file
                 P_O = np.loadtxt(obj_dir, delimiter=" ")
                 try:
@@ -68,6 +89,8 @@ def prepare_scenes(dataset_name):
                     ok = False
                     break
                 p_vec = np.ones((P_O.shape[0], 1), np.int32)
+                l_vec = np.ones((P_O.shape[0], 1), np.uint8)
+                l_vec *= obj_labels[obj_name]
                 label = obj_file.split("_")[0]
                 if label in special_objects:
                     p_vec *= special_objects[label]
@@ -75,6 +98,7 @@ def prepare_scenes(dataset_name):
                     p_vec *= O
                     O += 1
                 partition_vec = np.vstack((partition_vec, p_vec))
+                label_vec = np.vstack((label_vec, l_vec))
             if ok:
                 xyz_min = np.min(P[:, :3], axis=0)
                 P[:, :3] = P[:, :3] - xyz_min
@@ -86,13 +110,21 @@ def prepare_scenes(dataset_name):
                 P = P[sortation, :]
                 P[:, 3:] /= 255
                 #print(P.shape)
+                label_vec = label_vec[sortation]
                 partition_vec = partition_vec[sortation]
                 #print(partition_vec.shape)
                 partition_uni, partition_idxs, partition_counts = np.unique(partition_vec, return_index=True, return_counts=True)
                 #print(partition_uni)
 
-                np.savez(n_scene_dir + "/P.npz", P=P, partition_vec=partition_vec, partition_uni=partition_uni, partition_idxs=partition_idxs, partition_counts=partition_counts)
+                np.savez(n_scene_dir + "/P.npz", P=P, labels=label_vec, partition_vec=partition_vec, partition_uni=partition_uni, partition_idxs=partition_idxs, partition_counts=partition_counts)
 
+
+def load_scene(scene):
+    filename = "./S3DIS_Scenes/" + scene + "/P.npz"
+    data = np.load(filename)
+    P = data["P"]
+    labels = data["labels"]
+    return P, labels
 
 def main():
     """Program entry point. """
@@ -131,49 +163,24 @@ def main():
     print(args)
     print("mode:", args.mode)
     if args.mode == "visualize_single":
-        dat_p = DataProvider(verbose=args.verbose)
-        dat_p.id = args.scene
-        print("scene:", args.scene)
-        P, partition_vec, id = dat_p.get_cloud_and_partition()
-        print(id, P.shape, partition_vec.shape)
-        # n_objects = np.unique(partition_vec).shape[0]
+        P, labels = load_scene(args.scene)
+        print(args.scene, P.shape, labels.shape)
+        P[:, 3:] *= 255
         render_point_cloud(P=P, animate=args.animate)
         render_point_cloud(
-            P=P, partition_vec=partition_vec, animate=args.animate)
-        if args.render_segs:
-            render_all_segments(P=P, partition_vec=partition_vec, animate=args.animate)
-         # """
+            P=P, partition_vec=labels, animate=args.animate)
     else:
         prepare_scenes("s3dis")
         if args.mode != "visualize_all":
             return
-        dat_p = DataProvider(verbose=args.verbose)
-        dat_p.select_id()
-        #nP_mean = []
-        for i in range(len(dat_p.scenes)):
-            P, partition_vec, id, _, _, _ = dat_p.get_cloud_and_partition()
-            #if P.shape[0] < 1000000:
-            #    nP_mean.append(P.shape[0])
-            #else:
-            #    dat_p.add_id_to_blacklist()
-            #"""
-            print(id, P.shape, partition_vec.shape, "progress:", i, "/", len(dat_p.scenes))
-            if args.mode == "visualize_all":
-                if args.use_scene:
-                    if dat_p.id == args.scene:
-                        args.use_scene = False
-                    else:
-                        dat_p.select_id()
-                        continue
-                # render_point_cloud(P=P, animate=args.animate, width=960)
-                render_point_cloud(P=P, animate=args.animate, width=960, left=960)
-                render_point_cloud(
-                    P=P, partition_vec=partition_vec, animate=args.animate, width=960, left=960)
-                # render_point_cloud(P=P[:, :3], partition_vec=partition_vec, animate=args.animate)
-                #"""
-            dat_p.select_id()
-        #print(np.mean(nP_mean), "(", np.std(nP_mean), ")")
-        #print(len(nP_mean), "/", len(dat_p.scenes))
+        scenes = os.listdir("./S3DIS_Scenes")
+        for i in range(len(scenes)):
+            scene = scenes[i]
+            P, labels = load_scene(args.scene)
+            print(id, P.shape, labels.shape, "progress:", i, "/", len(scenes))
+            render_point_cloud(P=P, animate=args.animate)
+            render_point_cloud(
+                P=P, partition_vec=partition_vec, animate=args.animate)
 
 
 if __name__ == "__main__":

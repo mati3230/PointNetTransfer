@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import glob
+import open3d as o3d
 
 def mkdir(directory):
     """Method to create a new directory.
@@ -31,6 +32,135 @@ def file_exists(filepath):
     return os.path.isfile(filepath)
 
 
+def coordinate_system():
+    """Returns a coordinate system.
+
+    Returns
+    -------
+    o3d.geometry.LineSet
+        The lines of a coordinate system that are colored in red, green
+        and blue.
+
+    """
+    line_set = o3d.geometry.LineSet()
+    points = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    colors = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    lines = np.array([[0, 1], [0, 2], [0, 3]]).astype(int)
+    line_set.points = o3d.utility.Vector3dVector(points)
+    line_set.colors = o3d.utility.Vector3dVector(colors)
+    line_set.lines = o3d.utility.Vector2iVector(lines)
+    return line_set
+
+
+def render_pc(pcd, animate=False, x_speed=2.5, y_speed=0.0, width=1920, left=0):
+    """Render a point cloud.
+
+    Parameters
+    ----------
+    pcd : o3d.PointCloud
+        Open3D point cloud.
+    animate : boolean
+        If True, the point cloud will be rotated with x_speed and y_speed. A
+        simulation of dragging the mouse in standard rendering mode is
+        simulated.
+    x_speed : float
+        Used if point cloud will be animated. Strength if the horizontal mouse
+        drag.
+    y_speed : float
+        Used if point cloud will be animated. Strength if the vertical mouse
+        drag.
+    width : int
+        Set the width of the open3D plot
+    left : int
+        How much should the open3D plot be dragged to the right.
+
+    """
+    if animate:
+        def rotate_view(vis):
+            ctr = vis.get_view_control()
+            ctr.rotate(x_speed, y_speed)
+            return False
+        o3d.visualization.draw_geometries_with_animation_callback(
+            [pcd, coordinate_system()], rotate_view, width=width, left=left)
+    else:
+        o3d.visualization.draw_geometries([pcd, coordinate_system()], width=width, left=left)
+
+
+def render_point_cloud(
+        P, partition_vec=None, classification=None, gt_partition=None, animate=False, x_speed=2.5, y_speed=0.0, width=1920, left=0):
+    """Displays a point cloud.
+
+    Parameters
+    ----------
+    P : np.ndarray
+        Nx3 or Nx6 matrix. N is the number of points. A point should have at
+        least 3 spatial coordinates and can have optionally 3 color values.
+    partition_vec : np.ndarray
+        The partition of the point cloud.
+    classification : np.ndarray
+        Match classification matrix.
+    gt_partition : np.ndarray
+        Ground truth partition.
+    animate : boolean
+        If True, the point cloud will be rotated with x_speed and y_speed. A
+        simulation of dragging the mouse in standard rendering mode is
+        simulated.
+    x_speed : float
+        Used if point cloud will be animated. Strength if the horizontal mouse
+        drag.
+    y_speed : float
+        Used if point cloud will be animated. Strength if the vertical mouse
+        drag.
+    width : int
+        Set the width of the open3D plot
+    left : int
+        How much should the open3D plot be dragged to the right.
+    """
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(P[:, :3])
+    if partition_vec is not None:
+        col_mat = np.zeros((P.shape[0], 3))
+        data = np.load("colors.npz")
+        colors = data["colors"]
+        superpoints = np.unique(partition_vec)
+        n_superpoints = superpoints.shape[0]
+        if classification is not None and gt_partition is not None:
+            segment_val_to_color_idx = {}
+            if n_superpoints != classification.shape[0]:
+                raise Exception("Mismatch of number of superpoints in the classification and the partition.")
+            for i in range(n_superpoints):
+                superpoint_value = superpoints[i]
+                idxs = np.where(classification[i, :] != 0)[0]
+                if idxs.shape[0] > 1:
+                    raise Exception("One-to-many assignment in classification")
+                if idxs.shape[0] == 1:
+                    color_idx = idxs[0]
+                    segment_val_to_color_idx[superpoint_value] = color_idx
+            color_idx_offset = classification.shape[1]
+            for i in range(n_superpoints):
+                superpoint_value = superpoints[i]
+                idx = np.where(partition_vec == superpoint_value)[0]
+                col_idx = color_idx_offset + i
+                if superpoint_value in segment_val_to_color_idx:
+                    col_idx = segment_val_to_color_idx[superpoint_value]
+                col_mat[idx, :] = colors[col_idx, :] / 255
+        else:
+            for i in range(n_superpoints):
+                superpoint_value = superpoints[i]
+                idx = np.where(partition_vec == superpoint_value)[0]
+                color = colors[i, :] / 255
+                col_mat[idx, :] = color
+        pcd.colors = o3d.utility.Vector3dVector(col_mat)
+    else:
+        try:
+            # print(P[:5, 3:6] / 255.0)
+            pcd.colors = o3d.utility.Vector3dVector(P[:, 3:6] / 255.0)
+        except Exception as e:
+            print(e)
+    render_pc(pcd=pcd, animate=animate, x_speed=x_speed, y_speed=y_speed, width=width, left=left)
+    return pcd
+
+
 def collect_point_label(anno_path, out_filename, file_format='txt'):
     """ Convert original dataset files to data_label file (each line is XYZRGBL).
         We aggregated all the points from each instance in the room.
@@ -44,7 +174,7 @@ def collect_point_label(anno_path, out_filename, file_format='txt'):
         the points are shifted before save, the most negative point is now at origin.
     """
     points_list = []
-    
+
     for f in glob.glob(os.path.join(anno_path, '*.txt')):
         cls = os.path.basename(f).split('_')[0]
         if cls not in g_classes: # note: in some room there is 'staris' class..
@@ -52,11 +182,11 @@ def collect_point_label(anno_path, out_filename, file_format='txt'):
         points = np.loadtxt(f)
         labels = np.ones((points.shape[0],1)) * g_class2label[cls]
         points_list.append(np.concatenate([points, labels], 1)) # Nx7
-    
+
     data_label = np.concatenate(points_list, 0)
     xyz_min = np.amin(data_label, axis=0)[0:3]
     data_label[:, 0:3] -= xyz_min
-    
+
     if file_format=='txt':
         fout = open(out_filename, 'w')
         for i in range(data_label.shape[0]):
@@ -96,7 +226,7 @@ def point_label_to_obj(input_filename, out_filename, label_color=True, easy_view
             fout.write('v %f %f %f %d %d %d\n' % \
                 (data[i,0], data[i,1], data[i,2], data[i,3], data[i,4], data[i,5]))
     fout.close()
- 
+
 
 
 # -----------------------------------------------------------------------------
@@ -124,7 +254,7 @@ def sample_data_label(data, label, num_sample):
     new_data, sample_indices = sample_data(data, num_sample)
     new_label = label[sample_indices]
     return new_data, new_label
-    
+
 def room2blocks(data, label, num_point, block_size=1.0, stride=1.0,
                 random_sample=False, sample_num=None, sample_aug=1):
     """ Prepare block training data.
@@ -143,14 +273,14 @@ def room2blocks(data, label, num_point, block_size=1.0, stride=1.0,
     Returns:
         block_datas: K x num_point x 6 np array of XYZRGB, RGB is in [0,1]
         block_labels: K x num_point x 1 np array of uint8 labels
-        
+
     TODO: for this version, blocking is in fixed, non-overlapping pattern.
     """
     assert(stride<=block_size)
 
     limit = np.amax(data, 0)[0:3]
-     
-    # Get the corner location for our sampling blocks    
+
+    # Get the corner location for our sampling blocks
     xbeg_list = []
     ybeg_list = []
     if not random_sample:
@@ -166,8 +296,8 @@ def room2blocks(data, label, num_point, block_size=1.0, stride=1.0,
         if sample_num is None:
             sample_num = num_block_x * num_block_y * sample_aug
         for _ in range(sample_num):
-            xbeg = np.random.uniform(-block_size, limit[0]) 
-            ybeg = np.random.uniform(-block_size, limit[1]) 
+            xbeg = np.random.uniform(-block_size, limit[0])
+            ybeg = np.random.uniform(-block_size, limit[1])
             xbeg_list.append(xbeg)
             ybeg_list.append(ybeg)
 
@@ -175,7 +305,7 @@ def room2blocks(data, label, num_point, block_size=1.0, stride=1.0,
     block_data_list = []
     block_label_list = []
     idx = 0
-    for idx in range(len(xbeg_list)): 
+    for idx in range(len(xbeg_list)):
        xbeg = xbeg_list[idx]
        ybeg = ybeg_list[idx]
        xcond = (data[:,0]<=xbeg+block_size) & (data[:,0]>=xbeg)
@@ -183,16 +313,16 @@ def room2blocks(data, label, num_point, block_size=1.0, stride=1.0,
        cond = xcond & ycond
        if np.sum(cond) < 100: # discard block if there are less than 100 pts.
            continue
-       
+
        block_data = data[cond, :]
        block_label = label[cond]
-       
+
        # randomly subsample data
        block_data_sampled, block_label_sampled = \
            sample_data_label(block_data, block_label, num_point)
        block_data_list.append(np.expand_dims(block_data_sampled, 0))
        block_label_list.append(np.expand_dims(block_label_sampled, 0))
-            
+
     return np.concatenate(block_data_list, 0), \
            np.concatenate(block_label_list, 0)
 
@@ -204,10 +334,10 @@ def room2blocks_plus(data_label, num_point, block_size, stride,
     data = data_label[:,0:6]
     data[:,3:6] /= 255.0
     label = data_label[:,-1].astype(np.uint8)
-    
+
     return room2blocks(data, label, num_point, block_size, stride,
                        random_sample, sample_num, sample_aug)
-   
+
 def room2blocks_wrapper(data_label_filename, num_point, block_size=1.0, stride=1.0,
                         random_sample=False, sample_num=None, sample_aug=1):
     if data_label_filename[-3:] == 'txt':
@@ -231,7 +361,7 @@ def room2blocks_plus_normalized(data_label, num_point, block_size, stride,
     max_room_x = max(data[:,0])
     max_room_y = max(data[:,1])
     max_room_z = max(data[:,2])
-    
+
     data_batch, label_batch = room2blocks(data, label, num_point, block_size, stride,
                                           random_sample, sample_num, sample_aug)
     new_data_batch = np.zeros((data_batch.shape[0], num_point, 9))
@@ -274,7 +404,7 @@ def room2samples(data, label, sample_num_point):
     """
     N = data.shape[0]
     order = np.arange(N)
-    np.random.shuffle(order) 
+    np.random.shuffle(order)
     data = data[order, :]
     label = label[order]
 
@@ -305,7 +435,7 @@ def room2samples_plus_normalized(data_label, num_point):
     max_room_y = max(data[:,1])
     max_room_z = max(data[:,2])
     #print(max_room_x, max_room_y, max_room_z)
-    
+
     data_batch, label_batch = room2samples(data, label, num_point)
     new_data_batch = np.zeros((data_batch.shape[0], num_point, 9))
     for b in range(data_batch.shape[0]):
@@ -338,7 +468,7 @@ def room2samples_wrapper_normalized(data_label_filename, num_point):
 def collect_bounding_box(anno_path, out_filename):
     """ Compute bounding boxes from each instance in original dataset files on
         one room. **We assume the bbox is aligned with XYZ coordinate.**
-    
+
     Args:
         anno_path: path to annotations. e.g. Area_1/office_2/Annotations/
         out_filename: path to save instance bounding boxes for that room.
@@ -366,8 +496,8 @@ def collect_bounding_box(anno_path, out_filename):
 
     bbox_label = np.concatenate(bbox_label_list, 0)
     room_xyz_min = np.amin(bbox_label[:, 0:3], axis=0)
-    bbox_label[:, 0:3] -= room_xyz_min 
-    bbox_label[:, 3:6] -= room_xyz_min 
+    bbox_label[:, 0:3] -= room_xyz_min
+    bbox_label[:, 3:6] -= room_xyz_min
 
     fout = open(out_filename, 'w')
     for i in range(bbox_label.shape[0]):
@@ -379,7 +509,7 @@ def collect_bounding_box(anno_path, out_filename):
 
 def bbox_label_to_obj(input_filename, out_filename_prefix, easy_view=False):
     """ Visualization of bounding boxes.
-    
+
     Args:
         input_filename: each line is x1 y1 z1 x2 y2 z2 label
         out_filename_prefix: OBJ filename prefix,
@@ -435,14 +565,14 @@ def bbox_label_to_obj(input_filename, out_filename_prefix, easy_view=False):
         fout_mtl.write('Kd %f %f %f\n' % (color[0], color[1], color[2]))
         fout_mtl.write('\n')
         fout_obj.close()
-        fout_mtl.close() 
+        fout_mtl.close()
 
         v_cnt += 8
         ins_cnt += 1
 
 def bbox_label_to_obj_room(input_filename, out_filename_prefix, easy_view=False, permute=None, center=False, exclude_table=False):
     """ Visualization of bounding boxes.
-    
+
     Args:
         input_filename: each line is x1 y1 z1 x2 y2 z2 label
         out_filename_prefix: OBJ filename prefix,
@@ -466,7 +596,7 @@ def bbox_label_to_obj_room(input_filename, out_filename_prefix, easy_view=False,
         bbox[:,3:6] -= (xyz_max/2.0)
         bbox /= np.max(xyz_max/2.0)
     label = bbox_label[:, -1].astype(int)
-    obj_filename = out_filename_prefix+'.obj' 
+    obj_filename = out_filename_prefix+'.obj'
     mtl_filename = out_filename_prefix+'.mtl'
 
     fout_obj = open(obj_filename, 'w')
@@ -516,7 +646,7 @@ def bbox_label_to_obj_room(input_filename, out_filename_prefix, easy_view=False,
         ins_cnt += 1
 
     fout_obj.close()
-    fout_mtl.close() 
+    fout_mtl.close()
 
 
 def collect_point_bounding_box(anno_path, out_filename, file_format):
@@ -524,7 +654,7 @@ def collect_point_bounding_box(anno_path, out_filename, file_format):
         one room. **We assume the bbox is aligned with XYZ coordinate.**
         Save both the point XYZRGB and the bounding box for the point's
         parent element.
- 
+
     Args:
         anno_path: path to annotations. e.g. Area_1/office_2/Annotations/
         out_filename: path to save instance bounding boxes for each point,
@@ -561,7 +691,7 @@ def collect_point_bounding_box(anno_path, out_filename, file_format):
 
     point_bbox = np.concatenate(point_bbox_list, 0) # KxNx13
     room_xyz_min = np.amin(point_bbox[:, 0:3], axis=0)
-    point_bbox[:, 0:3] -= room_xyz_min 
+    point_bbox[:, 0:3] -= room_xyz_min
 
     if file_format == 'txt':
         fout = open(out_filename, 'w')
@@ -572,7 +702,7 @@ def collect_point_bounding_box(anno_path, out_filename, file_format):
                            point_bbox[i,6],
                            point_bbox[i,7], point_bbox[i,8], point_bbox[i,9],
                            point_bbox[i,10], point_bbox[i,11], point_bbox[i,12]))
-        
+
         fout.close()
     elif file_format == 'numpy':
         np.save(out_filename, point_bbox)
