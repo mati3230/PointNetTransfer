@@ -18,7 +18,8 @@ def get_loss(seg_pred, seg, t, reg_f=1e-3, check_numerics=True):
     seg_loss = tf.reduce_mean(per_instance_seg_loss)
 
     K = tf.shape(t)[1]
-    mat_diff = tf.matmul(t, tf.transpose(t, perm=[0,2,1])) - tf.constant(np.eye(K), dtype=tf.float32)
+    mul = tf.matmul(t, tf.transpose(t, perm=[0,2,1]))
+    mat_diff = mul - tf.constant(np.eye(K), dtype=tf.float32)
     mat_diff_loss = tf.nn.l2_loss(mat_diff)
     if check_numerics:
         mat_diff_loss = tf.debugging.check_numerics(mat_diff_loss, "mat_diff_loss")
@@ -57,9 +58,10 @@ def main():
     parser.add_argument("--batch_size", type=int, default=16, help="Training batch_size.")
     parser.add_argument("--learning_rate", type=float, default=1e-3, help="Training learning rate.")
     parser.add_argument("--global_norm_t", type=float, default=1, help="Training global norm threshold.")
-    parser.add_argument("--test_interval", type=int, default=10, help="Interval to test the model.")
+    parser.add_argument("--train_p", type=float, default=0.8, help="Percentage of training data.")
+    parser.add_argument("--test_interval", type=int, default=1, help="Interval to test the model.")
     parser.add_argument("--max_epoch", type=int, default=200, help="Number of epochs.")
-    parser.add_argument("--n_classes", type=int, default=13, help="Number of classes.")
+    parser.add_argument("--n_classes", type=int, default=14, help="Number of classes.")
     parser.add_argument("--initializer", type=str, default="glorot_uniform", help="Initializer of the weights.")
     parser.add_argument("--check_numerics", type=bool, default=False, help="Should NaN or Inf values be checked.")
     args = parser.parse_args()
@@ -75,7 +77,7 @@ def main():
 
     block_dirs = os.listdir(block_dir)
     all_idxs = np.arange(len(block_dirs)).astype(np.int32)
-    train_p = 0.8
+    train_p = args.train_p
     train_n = math.floor(train_p * len(all_idxs))
     test_n = len(all_idxs) - train_n
     print("Use {0} blocks for training and {1} blocks for testing".format(train_n, test_n))
@@ -130,18 +132,24 @@ def main():
             train_summary_writer.flush()
             train_step += 1
         if n_epoch % test_interval == 0:
-            net.save(net_only=True)
+            current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+            net.save(directory="./models", filename="pointnet_" + current_time, net_only=True)
             accs = []
             for i in range(test_idxs.shape[0]):
                 idx = test_idxs[i]
                 b, l = load_block(block_dir, idx)
-                pred = net(b)
-                tp = np.where(pred == l)[0]
+                b = np.expand_dims(b, axis=0)
+                l = np.expand_dims(l, axis=0)
+                t, pred = net(b)
+                pred = tf.nn.softmax(pred)
+                idxs = tf.math.argmax(pred, axis=-1)
+                tp = np.where(idxs == l)[0]
                 acc = tp / l.shape[0]
                 accs.append(acc)
             with train_summary_writer.as_default():
                 tf.summary.scalar("test/mean_acc", np.mean(acc), step=test_step)
                 tf.summary.scalar("test/std_acc", np.std(acc), step=test_step)
+            train_summary_writer.flush()
             test_step += 1
 
 

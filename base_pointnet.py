@@ -199,9 +199,9 @@ class PointNet(BaseNet):
         #print(input_T.shape)
 
         # forward net
-        input_T = tf.matmul(input_points, input_T)
+        g = tf.matmul(input_points, input_T)
         #print("G", g.shape)
-        g = self.c1g(input_T)
+        g = self.c1g(g)
         g = self.bn1g(g)
         #print(g.shape)
         g = self.c2g(g)

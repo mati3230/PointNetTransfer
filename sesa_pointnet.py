@@ -45,7 +45,7 @@ class SeSaPointNet(BaseClassifier):
         self.c3 = Conv1D(
             filters=n_classes,
             kernel_size=1,
-            activation="relu",
+            activation="linear",
             name=name+"/c3",
             trainable=trainable,
             kernel_initializer=initializer)
