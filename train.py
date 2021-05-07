@@ -86,6 +86,7 @@ def main():
     np.random.shuffle(train_idxs)
 
     n_batches = math.floor(train_n / batch_size)
+    n_t_batches = math.floor(test_n / batch_size)
 
     n_epoch = 0
     max_epoch = args.max_epoch
@@ -93,6 +94,8 @@ def main():
     b, l = load_block(block_dir, 0)
     blocks = np.zeros((batch_size, ) + b.shape, np.float32)
     labels = np.zeros((batch_size, ) + (l.shape[0], ), np.uint8)
+    t_blocks = np.zeros((batch_size, ) + b.shape, np.float32)
+    t_labels = np.zeros((batch_size, ) + (l.shape[0], ), np.uint8)
 
     net = SeSaPointNet(
         name="SeSaPN",
@@ -134,21 +137,19 @@ def main():
         if n_epoch % test_interval == 0:
             current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
             net.save(directory="./models", filename="pointnet_" + current_time, net_only=True)
-            accs = []
-            for i in range(test_idxs.shape[0]):
-                idx = test_idxs[i]
-                b, l = load_block(block_dir, idx)
-                b = np.expand_dims(b, axis=0)
-                l = np.expand_dims(l, axis=0)
-                t, pred = net(b)
+            acc = 0
+            for i in range(n_t_batches):
+                t_blocks, t_labels = load_batch(i, test_idxs, block_dir, t_blocks, t_labels, batch_size)
+                t, pred = net(t_blocks)
                 pred = tf.nn.softmax(pred)
-                idxs = tf.math.argmax(pred, axis=-1)
-                tp = np.where(idxs == l)[0]
-                acc = tp / l.shape[0]
-                accs.append(acc)
+                pred = pred.numpy()
+                classes = np.argmax(pred, axis=-1)
+                tp = np.where(classes == t_labels)
+                n_points = t_labels.shape[0]*t_labels.shape[1]
+                acc += tp[0].shape[0] / n_points
+            acc /= n_t_batches
             with train_summary_writer.as_default():
-                tf.summary.scalar("test/mean_acc", np.mean(acc), step=test_step)
-                tf.summary.scalar("test/std_acc", np.std(acc), step=test_step)
+                tf.summary.scalar("test/mean_acc", acc, step=test_step)
             train_summary_writer.flush()
             test_step += 1
 
