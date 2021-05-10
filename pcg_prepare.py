@@ -7,7 +7,6 @@ from utils import mkdir, file_exists, render_point_cloud, create_blocks
 def prepare_scenes():
     mkdir("./PCG_Scenes")
     pcg_dir = os.environ["PCG_DIR"] + "/data"
-    special_objects = get_special_objects()
 
     i = 1
     for filename in os.listdir(pcg_dir):
@@ -25,7 +24,7 @@ def prepare_scenes():
         label_vec = data[:, 6]
 
         n_scene_dir = "./PCG_Scenes/scene" + str(i)
-
+        mkdir(n_scene_dir)
         np.savez(n_scene_dir + "/P.npz", P=P, labels=label_vec)
         i += 1
 
