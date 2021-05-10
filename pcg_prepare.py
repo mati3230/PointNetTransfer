@@ -8,6 +8,7 @@ def prepare_scenes():
     mkdir("./PCG_Scenes")
     pcg_dir = os.environ["PCG_DIR"] + "/data"
 
+    max_label = 0
     i = 1
     for filename in os.listdir(pcg_dir):
         scene_file = pcg_dir + "/" + filename
@@ -15,18 +16,24 @@ def prepare_scenes():
             continue
         if not scene_file.endswith(".csv"):
             continue
-        data = np.loadtxt(scene_file, delimiter=";", skiprows=1)
-        P = data[:, :6]
-        
-        xyz_min = np.min(P[:, :3], axis=0)
-        P[:, :3] = P[:, :3] - xyz_min
-        
-        label_vec = data[:, 6]
 
         n_scene_dir = "./PCG_Scenes/scene" + str(i)
-        mkdir(n_scene_dir)
-        np.savez(n_scene_dir + "/P.npz", P=P, labels=label_vec)
+        data = np.loadtxt(scene_file, delimiter=";", skiprows=1)
+        label_vec = data[:, 6].astype(np.uint8)
+        if not file_exists(n_scene_dir + "/P.npz"):
+            P = data[:, :6]
+            
+            xyz_min = np.min(P[:, :3], axis=0)
+            P[:, :3] = P[:, :3] - xyz_min
+            
+
+            mkdir(n_scene_dir)
+            np.savez(n_scene_dir + "/P.npz", P=P, labels=label_vec)
+        uni = np.unique(label_vec)
+        ml = int(np.max(uni))
+        max_label = max(max_label, ml)
         i += 1
+    print("got max_label", max_label)
 
 
 def load_scene(scene):
