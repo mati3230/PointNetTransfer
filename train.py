@@ -136,7 +136,7 @@ def main():
             train_step += 1
         if n_epoch % test_interval == 0:
             current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-            net.save(directory="./models", filename="pointnet_" + current_time, net_only=True)
+            net.save(directory="./models", filename="pointnet_" + current_time, net_only=False)
             acc = 0
             for i in range(n_t_batches):
                 t_blocks, t_labels = load_batch(i, test_idxs, block_dir, t_blocks, t_labels, batch_size)
@@ -152,6 +152,7 @@ def main():
                 tf.summary.scalar("test/mean_acc", acc, step=test_step)
             train_summary_writer.flush()
             test_step += 1
+        n_epoch += 1
 
 
 

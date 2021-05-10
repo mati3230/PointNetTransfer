@@ -80,6 +80,7 @@ class SeSaPointNet(BaseClassifier):
             vars_.extend(self.c3.non_trainable_weights)
             vars_.extend(self.bn1.non_trainable_weights)
             vars_.extend(self.bn2.non_trainable_weights)
+        return vars_
 
     def reset(self):
         self.net.reset()
