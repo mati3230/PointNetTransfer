@@ -3,6 +3,7 @@ import numpy as np
 import glob
 import open3d as o3d
 
+
 def mkdir(directory):
     """Method to create a new directory.
 
@@ -227,6 +228,22 @@ def point_label_to_obj(input_filename, out_filename, label_color=True, easy_view
                 (data[i,0], data[i,1], data[i,2], data[i,3], data[i,4], data[i,5]))
     fout.close()
 
+
+def create_blocks(dataset, num_points=4096):
+    block_dir = "./Blocks_" + dataset
+    mkdir(block_dir)
+    scenes = os.listdir("./" + dataset + "_Scenes")
+    block_n = 0
+    for i in range(len(scenes)):
+        scene = scenes[i]
+        P, labels = load_scene(scene)
+        blocks, b_labels = room2blocks(data=P, label=labels, num_point=num_points)
+        for k in range(blocks.shape[0]):
+            block = blocks[k]
+            b_label = b_labels[k]
+            np.savez(block_dir + "/" + str(block_n) + ".npz", block=block, labels=b_label)
+            block_n += 1
+    print(block_n, "Blocks saved.")
 
 
 # -----------------------------------------------------------------------------

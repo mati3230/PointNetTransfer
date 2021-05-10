@@ -63,6 +63,7 @@ def main():
     parser.add_argument("--max_epoch", type=int, default=200, help="Number of epochs.")
     parser.add_argument("--n_classes", type=int, default=14, help="Number of classes.")
     parser.add_argument("--initializer", type=str, default="glorot_uniform", help="Initializer of the weights.")
+    parser.add_argument("--dataset", type=str, default="S3DIS", help="Name of the dataset.")
     parser.add_argument("--check_numerics", type=bool, default=False, help="Should NaN or Inf values be checked.")
     args = parser.parse_args()
 
@@ -71,7 +72,7 @@ def main():
     learning_rate = args.learning_rate
     global_norm_t = args.global_norm_t
     test_interval = args.test_interval
-    block_dir = "Blocks"
+    block_dir = "Blocks_" + args.dataset
     n_classes = args.n_classes
     np.random.seed(seed)
 
