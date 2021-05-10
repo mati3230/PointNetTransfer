@@ -11,17 +11,19 @@ class BaseClassifier(ABC):
             seed=None,
             trainable=True,
             check_numerics=False,
-            initializer="glorot_uniform"):
+            initializer="glorot_uniform",
+            trainable_net=True):
         super().__init__()
         self.name = name
         self.seed = seed
         self.check_numerics = check_numerics
         self.n_classes = n_classes
         self.trainable = trainable
+        self.trainable_net = trainable_net
         self.init_net(
             name=name,
             seed=seed,
-            trainable=trainable,
+            trainable=trainable_net,
             check_numerics=check_numerics,
             initializer=initializer)
         self.init_variables(
@@ -80,24 +82,32 @@ class BaseClassifier(ABC):
             raise Exception("File path '" + filepath + "' does not exist")
         model_data = np.load(filepath, allow_pickle=True)
         vars_ = self.get_vars(net_only=net_only)
-        if len(vars_) != len(model_data):
-            keys = list(model_data.keys())
-            print("Expected:", len(vars_), "layer; Got:", len(model_data), "layer, file:", filepath)
-            if len(vars_) == 0 or len(model_data) == 0:
-                raise Exception("You have to apply a prediction with, e.g., random data to initialize the weights of the network.")
-            for i in range(min(len(vars_), len(model_data))):
-                print(vars_[i].name, "\t", keys[i])
-            print("Expected:")
+        if net_only:
             for i in range(len(vars_)):
-                print(vars_[i].name)
-            raise Exception("data mismatch")
-        i = 0
-        for key, value in model_data.items():
-            varname = str(vars_[i].name)
-            if np.isnan(value).any():
-                raise Exception("loaded value is NaN")
-            if key != varname:
-                raise Exception(
-                    "Variable names mismatch: " + key + ", " + varname)
-            vars_[i].assign(value)
-            i += 1
+                var_name = vars_[i].name
+                if var_name not in model_data:
+                    raise Exception("Got no variable with the name " + var_name)
+                model_var = model_data[var_name]
+                vars_[i].assign(model_var)
+        else:
+            if len(vars_) != len(model_data):
+                keys = list(model_data.keys())
+                print("Expected:", len(vars_), "layer; Got:", len(model_data), "layer, file:", filepath)
+                if len(vars_) == 0 or len(model_data) == 0:
+                    raise Exception("You have to apply a prediction with, e.g., random data to initialize the weights of the network.")
+                for i in range(min(len(vars_), len(model_data))):
+                    print(vars_[i].name, "\t", keys[i])
+                print("Expected:")
+                for i in range(len(vars_)):
+                    print(vars_[i].name)
+                raise Exception("data mismatch")
+            i = 0
+            for key, value in model_data.items():
+                varname = str(vars_[i].name)
+                if np.isnan(value).any():
+                    raise Exception("loaded value is NaN")
+                if key != varname:
+                    raise Exception(
+                        "Variable names mismatch: " + key + ", " + varname)
+                vars_[i].assign(value)
+                i += 1

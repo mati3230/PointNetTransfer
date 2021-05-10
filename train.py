@@ -57,7 +57,7 @@ def main():
     parser.add_argument("--seed", type=int, default=42, help="Set a random seed.")
     parser.add_argument("--batch_size", type=int, default=16, help="Training batch_size.")
     parser.add_argument("--learning_rate", type=float, default=1e-3, help="Training learning rate.")
-    parser.add_argument("--global_norm_t", type=float, default=1, help="Training global norm threshold.")
+    parser.add_argument("--global_norm_t", type=float, default=10, help="Training global norm threshold.")
     parser.add_argument("--train_p", type=float, default=0.8, help="Percentage of training data.")
     parser.add_argument("--test_interval", type=int, default=1, help="Interval to test the model.")
     parser.add_argument("--max_epoch", type=int, default=200, help="Number of epochs.")
@@ -65,6 +65,8 @@ def main():
     parser.add_argument("--initializer", type=str, default="glorot_uniform", help="Initializer of the weights.")
     parser.add_argument("--dataset", type=str, default="S3DIS", help="Name of the dataset.")
     parser.add_argument("--check_numerics", type=bool, default=False, help="Should NaN or Inf values be checked.")
+    parser.add_argument("--load", type=bool, default=False, help="Load feature detector.")
+    parser.add_argument("--model", type=str, help="Name of the feature detector that should be loaded.")
     args = parser.parse_args()
 
     seed = args.seed
@@ -98,13 +100,28 @@ def main():
     t_blocks = np.zeros((batch_size, ) + b.shape, np.float32)
     t_labels = np.zeros((batch_size, ) + (l.shape[0], ), np.uint8)
 
-    net = SeSaPointNet(
-        name="SeSaPN",
-        n_classes=n_classes,
-        seed=seed,
-        trainable=True,
-        check_numerics=args.check_numerics,
-        initializer=args.initializer)
+    if args.load:
+        net = SeSaPointNet(
+            name="SeSaPN",
+            n_classes=n_classes,
+            seed=seed,
+            trainable=True,
+            check_numerics=args.check_numerics,
+            initializer=args.initializer,
+            trainable_net=False)
+        tmp_b = np.array(b, copy=True)
+        tmp_b = np.expand_dims(b, axis=0)
+        net(tmp_b)
+        net.load(args.model, net_only=True)
+    else:
+        net = SeSaPointNet(
+            name="SeSaPN",
+            n_classes=n_classes,
+            seed=seed,
+            trainable=True,
+            check_numerics=args.check_numerics,
+            initializer=args.initializer,
+            trainable_net=True)
     optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
 
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -137,7 +154,7 @@ def main():
             train_step += 1
         if n_epoch % test_interval == 0:
             current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-            net.save(directory="./models", filename="pointnet_" + current_time, net_only=False)
+            net.save(directory="./models/" + args.dataset, filename="pointnet_" + current_time, net_only=False)
             acc = 0
             for i in range(n_t_batches):
                 t_blocks, t_labels = load_batch(i, test_idxs, block_dir, t_blocks, t_labels, batch_size)

@@ -141,21 +141,6 @@ def main():
         default="Area1_office_30",
         help="scene from the scannet dataset")
     parser.add_argument(
-        "--use_scene",
-        type=bool,
-        default=False,
-        help="used if all scenes are visualized")
-    parser.add_argument(
-        "--render_segs",
-        type=bool,
-        default=False,
-        help="flag to render every superpoint of scene")
-    parser.add_argument(
-        "--verbose",
-        type=bool,
-        default=False,
-        help="flag to print output")
-    parser.add_argument(
         "--animate",
         type=bool,
         default=False,

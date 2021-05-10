@@ -11,13 +11,15 @@ class SeSaPointNet(BaseClassifier):
             seed=None,
             trainable=True,
             check_numerics=False,
-            initializer="glorot_uniform"):
+            initializer="glorot_uniform",
+            trainable_net=True):
         super().__init__(name=name,
                 n_classes=n_classes,
                 seed=seed,
                 trainable=trainable,
                 check_numerics=check_numerics,
-                initializer=initializer)
+                initializer=initializer,
+                trainable_net=trainable_net)
 
     def init_variables(
             self,
