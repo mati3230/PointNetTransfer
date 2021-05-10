@@ -33,6 +33,14 @@ def file_exists(filepath):
     return os.path.isfile(filepath)
 
 
+def load_scene(dataset, scene):
+    filename = "./" + dataset + "_Scenes/" + scene + "/P.npz"
+    data = np.load(filename)
+    P = data["P"]
+    labels = data["labels"]
+    return P, labels
+
+
 def coordinate_system():
     """Returns a coordinate system.
 
@@ -236,7 +244,7 @@ def create_blocks(dataset, num_points=4096):
     block_n = 0
     for i in range(len(scenes)):
         scene = scenes[i]
-        P, labels = load_scene(scene)
+        P, labels = load_scene(dataset=dataset, scene=scene)
         blocks, b_labels = room2blocks(data=P, label=labels, num_point=num_points)
         for k in range(blocks.shape[0]):
             block = blocks[k]

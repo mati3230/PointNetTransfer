@@ -1,7 +1,7 @@
 import argparse
 import os
 import numpy as np
-from utils import mkdir, file_exists, render_point_cloud, create_blocks
+from utils import mkdir, file_exists, render_point_cloud, create_blocks, load_scene
 
 
 def prepare_scenes():
@@ -36,14 +36,6 @@ def prepare_scenes():
     print("got max_label", max_label)
 
 
-def load_scene(scene):
-    filename = "./PCG_Scenes/" + scene + "/P.npz"
-    data = np.load(filename)
-    P = data["P"]
-    labels = data["labels"]
-    return P, labels
-
-
 def main():
     """Program entry point. """
     parser = argparse.ArgumentParser()
@@ -71,7 +63,7 @@ def main():
     print(args)
     print("mode:", args.mode)
     if args.mode == "visualize_single":
-        P, labels = load_scene(args.scene)
+        P, labels = load_scene(dataset="PCG", scene=args.scene)
         print(args.scene, P.shape, labels.shape)
         P[:, 3:] *= 255
         render_point_cloud(P=P, animate=args.animate)
@@ -86,7 +78,7 @@ def main():
         scenes = os.listdir("./PCG_Scenes")
         for i in range(len(scenes)):
             scene = scenes[i]
-            P, labels = load_scene(scene)
+            P, labels = load_scene(dataset="PCG", scene=scene)
             print(scene, P.shape, labels.shape, "progress:", i, "/", len(scenes))
             render_point_cloud(P=P, animate=args.animate)
             render_point_cloud(

@@ -1,7 +1,7 @@
 import argparse
 import os
 import numpy as np
-from utils import mkdir, file_exists, render_point_cloud, create_blocks
+from utils import mkdir, file_exists, render_point_cloud, create_blocks, load_scene
 
 
 def get_special_objects():
@@ -119,14 +119,6 @@ def prepare_scenes(dataset_name):
                 np.savez(n_scene_dir + "/P.npz", P=P, labels=label_vec, partition_vec=partition_vec, partition_uni=partition_uni, partition_idxs=partition_idxs, partition_counts=partition_counts)
 
 
-def load_scene(scene):
-    filename = "./S3DIS_Scenes/" + scene + "/P.npz"
-    data = np.load(filename)
-    P = data["P"]
-    labels = data["labels"]
-    return P, labels
-
-
 def main():
     """Program entry point. """
     parser = argparse.ArgumentParser()
@@ -154,7 +146,7 @@ def main():
     print(args)
     print("mode:", args.mode)
     if args.mode == "visualize_single":
-        P, labels = load_scene(args.scene)
+        P, labels = load_scene(dataset="S3DIS", scene=args.scene)
         print(args.scene, P.shape, labels.shape)
         P[:, 3:] *= 255
         render_point_cloud(P=P, animate=args.animate)
@@ -169,7 +161,7 @@ def main():
         scenes = os.listdir("./S3DIS_Scenes")
         for i in range(len(scenes)):
             scene = scenes[i]
-            P, labels = load_scene(scene)
+            P, labels = load_scene(dataset="S3DIS", scene=scene)
             print(scene, P.shape, labels.shape, "progress:", i, "/", len(scenes))
             render_point_cloud(P=P, animate=args.animate)
             render_point_cloud(
