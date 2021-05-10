@@ -46,7 +46,10 @@ def load_batch(i, train_idxs, block_dir, blocks, labels, batch_size):
     for k in range(idxs.shape[0]):
         name = idxs[k]
         block, b_labels = load_block(block_dir, name)
-        b_labels = np.squeeze(b_labels, -1)
+        if len(b_labels.shape) == 2:
+            b_labels = np.squeeze(b_labels, -1)
+        elif len(b_labels.shape) > 2:
+            raise Exception("Unexpected shape of labels" + str(b_labels.shape))
         blocks[k] = block
         labels[k] = b_labels
     return blocks, labels
