@@ -54,6 +54,11 @@ def load_batch(i, train_idxs, block_dir, blocks, labels, batch_size):
         labels[k] = b_labels
     return blocks, labels
 
+def update_stats(stat_vec, t_uni):
+    unis, counts = np.unique(t_uni, return_counts=True)
+    stat_vec[unis] += counts
+    return stat_vec
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -141,6 +146,11 @@ def main():
     train_step = 0
     test_step = 0
 
+
+    gt_classes = np.zeros((n_classes, ), dtype=np.int32)
+    positive_classes = np.zeros((n_classes, ), dtype=np.int32)
+    tp_classes = np.zeros((n_classes, ), dtype=np.int32)
+
     while n_epoch < max_epoch:
         for i in range(n_batches):
             with tf.GradientTape() as tape:
@@ -193,19 +203,38 @@ def main():
         if n_epoch % test_interval == 0:
             current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
             net.save(directory="./models/" + args.dataset, filename="pointnet_" + current_time, net_only=False)
+            
             acc = 0
+            
+            gt_classes[:] = 0
+            positive_classes[:] = 0
+            tp_classes[:] = 0
+
             for i in range(n_t_batches):
                 t_blocks, t_labels = load_batch(i, test_idxs, block_dir, t_blocks, t_labels, batch_size)
                 t, pred = net(t_blocks, training=False)
                 pred = tf.nn.softmax(pred)
                 pred = pred.numpy()
                 classes = np.argmax(pred, axis=-1)
-                tp = np.where(classes == t_labels)
+
+                tp_idxs = np.where(classes == t_labels)
+                
                 n_points = t_labels.shape[0]*t_labels.shape[1]
-                acc += tp[0].shape[0] / n_points
+                acc += tp_idxs[0].shape[0] / n_points
+
+                gt_classes += update_stats(stat_vec=gt_classes, t_uni=t_labels)
+                positive_classes += update_stats(stat_vec=positive_classes, t_uni=classes)
+                
+                tp_vec = classes[tp_idxs[0], tp_idxs[1]]
+                tp_classes += update_stats(stat_vec=tp_classes, t_uni=tp_vec)
+
             acc /= n_t_batches
+
+            iou = tp_classes / (gt_classes + positive_classes - tp_classes)
+
             with train_summary_writer.as_default():
                 tf.summary.scalar("test/mean_acc", acc, step=test_step)
+                tf.summary.scalar("test/mean_iou", iou, step=test_step)
             train_summary_writer.flush()
             test_step += 1
         n_epoch += 1
