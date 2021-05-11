@@ -35,7 +35,7 @@ class BaseClassifier(ABC):
             initializer=initializer)
 
     @abstractmethod
-    def __call__(self, obs):
+    def __call__(self, obs, training):
         pass
 
     @abstractmethod

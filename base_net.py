@@ -96,7 +96,7 @@ class BaseNet(ABC):
         pass
 
     @abstractmethod
-    def __call__(self, obs):
+    def __call__(self, obs, training):
         """Compute a feature vector from the observation.
 
         Parameters

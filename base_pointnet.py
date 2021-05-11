@@ -135,31 +135,31 @@ class PointNet(BaseNet):
         self.r1itn = Reshape((6, 6), name=name+"/r1itn")
         self.r1ftn = Reshape((64, 64), name=name+"/r2itn")
 
-    def feature_t_net(self, g):
+    def feature_t_net(self, g, training):
         # feature transform net
         f = self.c1ftn(g)
-        f = self.bn1ftn(f)
+        f = self.bn1ftn(f, training=training)
         #print(f.shape)
         f = self.c2ftn(f)
-        f = self.bn2ftn(f)
+        f = self.bn2ftn(f, training=training)
         #print(f.shape)
         f = self.c3ftn(f)
-        f = self.bn3ftn(f)
+        f = self.bn3ftn(f, training=training)
         #print(f.shape)
         f = self.mp1ftn(f)
         #print(f.shape)
         f = self.d1ftn(f)
-        f = self.bn4ftn(f)
+        f = self.bn4ftn(f, training=training)
         #print(x.shape)
         f = self.d2ftn(f)
-        f = self.bn5ftn(f)
+        f = self.bn5ftn(f, training=training)
         #print(x.shape)
         f = self.d3ftn(f)
         #print(f.shape)
         feature_T = self.r1ftn(f)
         return feature_T
 
-    def input_t_net(self, input_points):
+    def input_t_net(self, input_points, training):
         # input_Transformation_net
         #print(input_points.shape)
         x = tf.expand_dims(input_points, -1)
@@ -168,21 +168,21 @@ class PointNet(BaseNet):
         #print(x.shape)
         x=tf.squeeze(x, axis=2)
         #print(x.shape)
-        x = self.bn1itn(x)
+        x = self.bn1itn(x, training=training)
         #print(x.shape)
         x = self.c2itn(x)
-        x = self.bn2itn(x)
+        x = self.bn2itn(x, training=training)
         #print(x.shape)
         x = self.c3itn(x)
-        x = self.bn3itn(x)
+        x = self.bn3itn(x, training=training)
         #print(x.shape)
         x = self.mp1itn(x)
         #print(x.shape)
         x = self.d1itn(x)
-        x = self.bn4itn(x)
+        x = self.bn4itn(x, training=training)
         #print(x.shape)
         x = self.d2itn(x)
-        x = self.bn5itn(x)
+        x = self.bn5itn(x, training=training)
         #print(x.shape)
         x = self.d3itn(x)
         #print(x.shape)
@@ -192,37 +192,37 @@ class PointNet(BaseNet):
         return input_T
 
     # @tf.function
-    def __call__(self, obs):
+    def __call__(self, obs, training):
         input_points = tf.dtypes.cast(obs, tf.float32)
         #print(input_points.shape)
-        input_T = self.input_t_net(input_points)
+        input_T = self.input_t_net(input_points, training=training)
         #print(input_T.shape)
 
         # forward net
         g = tf.matmul(input_points, input_T)
         #print("G", g.shape)
         g = self.c1g(g)
-        g = self.bn1g(g)
+        g = self.bn1g(g, training=training)
         #print(g.shape)
         g = self.c2g(g)
-        g = self.bn2g(g)
+        g = self.bn2g(g, training=training)
         #print("G", g.shape)
 
         #print(g.shape)
-        feature_T = self.feature_t_net(g)
+        feature_T = self.feature_t_net(g, training=training)
         #print(feature_T.shape)
 
         # forward net
         feature_T = tf.matmul(g, feature_T)
         # print("G", g.shape)
         g = self.c3g(feature_T)
-        g = self.bn3g(g)
+        g = self.bn3g(g, training=training)
         #print(g.shape)
         g = self.c4g(g)
-        g = self.bn4g(g)
+        g = self.bn4g(g, training=training)
         #print(g.shape)
         g = self.c5g(g)
-        g = self.bn5g(g)
+        g = self.bn5g(g, training=training)
         #print(g.shape)
 
         # global_feature

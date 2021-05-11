@@ -115,7 +115,7 @@ def main():
             trainable_net=False)
         tmp_b = np.array(b, copy=True)
         tmp_b = np.expand_dims(b, axis=0)
-        net(tmp_b)
+        net(tmp_b, training=False)
         net.load(directory=args.model_dir, filename=args.model_file, net_only=True)
     else:
         net = SeSaPointNet(
@@ -138,7 +138,7 @@ def main():
         for i in range(n_batches):
             with tf.GradientTape() as tape:
                 blocks, labels = load_batch(i, train_idxs, block_dir, blocks, labels, batch_size)
-                t, pred = net(blocks)
+                t, pred = net(blocks, training=True)
                 loss, seg_loss, mat_diff_loss = get_loss(seg_pred=pred, seg=labels, t=t)
                 vars_ = tape.watched_variables()
                 grads = tape.gradient(loss, vars_)
@@ -162,7 +162,7 @@ def main():
             acc = 0
             for i in range(n_t_batches):
                 t_blocks, t_labels = load_batch(i, test_idxs, block_dir, t_blocks, t_labels, batch_size)
-                t, pred = net(t_blocks)
+                t, pred = net(t_blocks, training=False)
                 pred = tf.nn.softmax(pred)
                 pred = pred.numpy()
                 classes = np.argmax(pred, axis=-1)
