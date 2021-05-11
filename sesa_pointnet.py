@@ -88,7 +88,7 @@ class SeSaPointNet(BaseClassifier):
         self.net.reset()
 
     def __call__(self, obs, training):
-        t, f, g = self.net(obs)
+        t, f, g = self.net(obs, training=training)
         g = tf.tile(g, multiples=[1, tf.shape(f)[1], 1])
         x = tf.concat((f, g), axis=-1)
         x = self.c1(x)
