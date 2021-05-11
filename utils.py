@@ -238,9 +238,9 @@ def point_label_to_obj(input_filename, out_filename, label_color=True, easy_view
 
 
 def create_blocks(dataset, num_points=4096):
-    block_dir = "./Blocks_" + dataset
+    block_dir = "./Blocks/" + dataset
     mkdir(block_dir)
-    scenes = os.listdir("./" + dataset + "_Scenes")
+    scenes = os.listdir("./Scenes/" + dataset)
     block_n = 0
     for i in range(len(scenes)):
         scene = scenes[i]

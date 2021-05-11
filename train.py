@@ -5,6 +5,7 @@ import datetime
 import argparse
 import os
 from sesa_pointnet import SeSaPointNet
+from utils import render_point_cloud
 
 
 def get_loss(seg_pred, seg, t, reg_f=1e-3, check_numerics=True):
@@ -34,8 +35,15 @@ def load_block(block_dir, name):
     block = data["block"]
     b_labels = data["labels"]
 
+    # translate into the origin
+    mean_block = np.mean(block[:, :3])
+    block[:, :3] -= mean_block
+
+    # uniformly scale to [-1, 1]
     max_block = np.max(np.abs(block[:, :3]))
     block[:, :3] /= max_block
+
+    # render_point_cloud(block)
 
     return block, b_labels
 
@@ -83,7 +91,7 @@ def main():
     learning_rate = args.learning_rate
     global_norm_t = args.global_norm_t
     test_interval = args.test_interval
-    block_dir = "Blocks_" + args.dataset
+    block_dir = "Blocks/" + args.dataset
     n_classes = args.n_classes
     np.random.seed(seed)
 
