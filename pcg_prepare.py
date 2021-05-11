@@ -5,7 +5,7 @@ from utils import mkdir, file_exists, render_point_cloud, create_blocks, load_sc
 
 
 def prepare_scenes():
-    mkdir("./PCG_Scenes")
+    mkdir("./Scenes/PCG")
     pcg_dir = os.environ["PCG_DIR"] + "/data"
 
     max_label = 0
@@ -17,7 +17,7 @@ def prepare_scenes():
         if not scene_file.endswith(".csv"):
             continue
 
-        n_scene_dir = "./PCG_Scenes/scene" + str(i)
+        n_scene_dir = "./Scenes/PCG/scene" + str(i)
         data = np.loadtxt(scene_file, delimiter=";", skiprows=1)
         label_vec = data[:, 6].astype(np.uint8)
         if not file_exists(n_scene_dir + "/P.npz"):
@@ -75,7 +75,7 @@ def main():
         prepare_scenes()
         if args.mode != "visualize_all":
             return
-        scenes = os.listdir("./PCG_Scenes")
+        scenes = os.listdir("./Scenes/PCG")
         for i in range(len(scenes)):
             scene = scenes[i]
             P, labels = load_scene(dataset="PCG", scene=scene)

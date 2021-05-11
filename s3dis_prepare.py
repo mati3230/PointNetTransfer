@@ -29,7 +29,7 @@ def prepare_scenes(dataset_name):
     dataset_name : str
         Name of the s3dis data set to create a blacklist.
     """
-    mkdir("./S3DIS_Scenes")
+    mkdir("./Scenes/S3DIS")
     s3dis_dir = os.environ["S3DIS_DIR"] + "/data"
     special_objects = get_special_objects()
 
@@ -58,7 +58,7 @@ def prepare_scenes(dataset_name):
         for scene in os.listdir(area_dir):
             scene_name = "Area" + dir[-1] + "_" + scene
             # print(scene_name)
-            n_scene_dir = "./S3DIS_Scenes/" + scene_name
+            n_scene_dir = "./Scenes/S3DIS/" + scene_name
             if file_exists(n_scene_dir + "/P.npz"):
                 continue
             scene_dir = area_dir + "/" + scene + "/Annotations"
@@ -158,7 +158,7 @@ def main():
         prepare_scenes("s3dis")
         if args.mode != "visualize_all":
             return
-        scenes = os.listdir("./S3DIS_Scenes")
+        scenes = os.listdir("./Scenes/S3DIS")
         for i in range(len(scenes)):
             scene = scenes[i]
             P, labels = load_scene(dataset="S3DIS", scene=scene)
