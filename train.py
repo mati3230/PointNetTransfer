@@ -69,7 +69,8 @@ def main():
     parser.add_argument("--dataset", type=str, default="S3DIS", help="Name of the dataset.")
     parser.add_argument("--check_numerics", type=bool, default=False, help="Should NaN or Inf values be checked.")
     parser.add_argument("--load", type=bool, default=False, help="Load feature detector.")
-    parser.add_argument("--model", type=str, help="Name of the feature detector that should be loaded.")
+    parser.add_argument("--model_file", type=str, help="Name of the feature detector that should be loaded.")
+    parser.add_argument("--model_dir", type=str, help="Directory of the feature detector that should be loaded.")
     args = parser.parse_args()
 
     seed = args.seed
@@ -115,7 +116,7 @@ def main():
         tmp_b = np.array(b, copy=True)
         tmp_b = np.expand_dims(b, axis=0)
         net(tmp_b)
-        net.load(args.model, net_only=True)
+        net.load(directory=args.model_dir, filename=args.model_file, net_only=True)
     else:
         net = SeSaPointNet(
             name="SeSaPN",
