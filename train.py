@@ -42,6 +42,11 @@ def load_block(block_dir, name):
     # uniformly scale to [-1, 1]
     max_block = np.max(np.abs(block[:, :3]))
     block[:, :3] /= max_block
+    
+    # scale point colors to [-0.5, 0.5]
+    block[:, 3:] -= 0.5
+    # scale point colors to [-1, 1]
+    block[:, 3:] *= 2
 
     # render_point_cloud(block)
 
