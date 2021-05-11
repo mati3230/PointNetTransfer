@@ -70,18 +70,18 @@ class SeSaPointNet(BaseClassifier):
         vars_ = self.net.get_vars()
         if net_only:
             return vars_
+        vars_.extend(self.bn1.trainable_weights)
+        vars_.extend(self.bn2.trainable_weights)
+        vars_.extend(self.bn1.non_trainable_weights)
+        vars_.extend(self.bn2.non_trainable_weights)
         if self.trainable:
             vars_.extend(self.c1.trainable_weights)
             vars_.extend(self.c2.trainable_weights)
             vars_.extend(self.c3.trainable_weights)
-            vars_.extend(self.bn1.trainable_weights)
-            vars_.extend(self.bn2.trainable_weights)
         else:
             vars_.extend(self.c1.non_trainable_weights)
             vars_.extend(self.c2.non_trainable_weights)
             vars_.extend(self.c3.non_trainable_weights)
-            vars_.extend(self.bn1.non_trainable_weights)
-            vars_.extend(self.bn2.non_trainable_weights)
         return vars_
 
     def reset(self):

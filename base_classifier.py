@@ -20,7 +20,7 @@ class BaseClassifier(ABC):
         self.n_classes = n_classes
         self.trainable = trainable
         self.trainable_net = trainable_net
-        self.ignore = ["moving_mean", "moving_variance"]
+        # self.ignore = ["moving_mean", "moving_variance"]
         self.init_net(
             name=name,
             seed=seed,
@@ -87,10 +87,12 @@ class BaseClassifier(ABC):
             keys = list(model_data.keys())
             for i in range(len(vars_)):
                 var_name = vars_[i].name
+                """
                 tmp = var_name.split("/")[-1]
                 tmp = tmp.split(":")[0]
                 if tmp in self.ignore:
                     continue
+                """
                 if var_name not in keys:
                     print(keys)
                     raise Exception("Got no variable with the name " + var_name)
