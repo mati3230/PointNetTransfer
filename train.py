@@ -92,6 +92,7 @@ def main():
     train_p = args.train_p
     train_n = math.floor(train_p * len(all_idxs))
     test_n = len(all_idxs) - train_n
+    # train_n = test_n = 16
     print("Use {0} blocks for training and {1} blocks for testing".format(train_n, test_n))
     train_idxs = np.random.choice(all_idxs, size=train_n, replace=False)
     test_idxs = np.delete(all_idxs, train_idxs)
@@ -230,11 +231,14 @@ def main():
 
             acc /= n_t_batches
 
-            iou = tp_classes / (gt_classes + positive_classes - tp_classes)
+            d = gt_classes + positive_classes - tp_classes
+            d[d == 0] = 1
+            iou = tp_classes / d
+            iou[d == 0] = 0
 
             with train_summary_writer.as_default():
                 tf.summary.scalar("test/mean_acc", acc, step=test_step)
-                tf.summary.scalar("test/mean_iou", iou, step=test_step)
+                tf.summary.scalar("test/mean_iou", np.sum(iou) / 13, step=test_step)
             train_summary_writer.flush()
             test_step += 1
         n_epoch += 1
