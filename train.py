@@ -87,6 +87,8 @@ def main():
     train_p = args.train_p
     train_n = math.floor(train_p * len(all_idxs))
     test_n = len(all_idxs) - train_n
+    train_n=16
+    test_n=16
     print("Use {0} blocks for training and {1} blocks for testing".format(train_n, test_n))
     train_idxs = np.random.choice(all_idxs, size=train_n, replace=False)
     test_idxs = np.delete(all_idxs, train_idxs)
@@ -116,7 +118,15 @@ def main():
         tmp_b = np.array(b, copy=True)
         tmp_b = np.expand_dims(b, axis=0)
         net(tmp_b, training=False)
+        net.reset()
         net.load(directory=args.model_dir, filename=args.model_file, net_only=True)
+        print("model loaded")
+        ft_net_vars_tmp = net.net.get_vars()
+        ft_net_vars = []
+        var_idxs = None
+        for z in range(len(ft_net_vars_tmp)):
+            ft_net_vars.append(ft_net_vars_tmp[z].name)
+        #print(ft_net_vars)
     else:
         net = SeSaPointNet(
             name="SeSaPN",
@@ -127,7 +137,6 @@ def main():
             initializer=args.initializer,
             trainable_net=True)
     optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
-
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     log_dir = "./logs/" + current_time
     train_summary_writer = tf.summary.create_file_writer(log_dir)
@@ -142,13 +151,40 @@ def main():
                 loss, seg_loss, mat_diff_loss = get_loss(seg_pred=pred, seg=labels, t=t)
                 vars_ = tape.watched_variables()
                 grads = tape.gradient(loss, vars_)
+                """for z in range(len(grads)):
+                    print(vars_[z].name, tf.reduce_sum(grads[z]), tf.reduce_sum(vars_[z]), vars_[z].trainable)
+                print("*---------------------------*")"""
+                # print(grads)
                 global_norm = tf.linalg.global_norm(grads)
                 if global_norm_t > 0:
                     grads, _ = tf.clip_by_global_norm(
                         grads,
                         global_norm_t,
                         use_norm=global_norm)
+                if args.load:
+                    if var_idxs is None:
+                        var_idxs = []
+                        for z in range(len(vars_)):
+                            var_name = vars_[z].name
+                            if var_name in ft_net_vars:
+                                var_idxs.append(z)
+                        # print(var_idxs)
+                    tmp_vars = []
+                    tmp_grads = []
+                    for z in range(len(vars_)):
+                        if z in var_idxs:
+                            continue
+                        tmp_vars.append(vars_[z])
+                        tmp_grads.append(grads[z])
+                    vars_ = tmp_vars
+                    grads = tmp_grads
                 optimizer.apply_gradients(zip(grads, vars_))
+                """
+                for z in range(len(grads)):
+                    print(vars_[z].name, tf.reduce_sum(vars_[z]))
+                print("*---------------------------*")
+                return
+                """
             with train_summary_writer.as_default():
                 tf.summary.scalar("train/loss", loss, step=train_step)
                 tf.summary.scalar("train/seg_loss", seg_loss, step=train_step)

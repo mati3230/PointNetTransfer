@@ -62,10 +62,10 @@ class PointNet(BaseNet):
             trainable=trainable,
             kernel_initializer=initializer)
         self.mp1itn = MaxPool1D(name=name + "/mp1itn", pool_size=self.n_points)
-        self.d1itn = Dense(512, activation="relu", name=name+"/d1itn")
-        self.d2itn = Dense(256, activation="relu", name=name+"/d2itn")
+        self.d1itn = Dense(512, activation="relu", name=name+"/d1itn", trainable=trainable)
+        self.d2itn = Dense(256, activation="relu", name=name+"/d2itn", trainable=trainable)
         bias3 = np.eye(6).flatten().astype(np.float32)
-        self.d3itn = Dense(36, weights=[np.zeros([256, 36]), bias3], name=name+"/d3itn")
+        self.d3itn = Dense(36, weights=[np.zeros([256, 36]), bias3], name=name+"/d3itn", trainable=trainable)
 
         self.c1g = Conv1D(
             filters=64,
@@ -104,10 +104,10 @@ class PointNet(BaseNet):
             trainable=trainable,
             kernel_initializer=initializer)
         self.mp1ftn = MaxPool1D(name=name + "/mp1ftn", pool_size=self.n_points)
-        self.d1ftn = Dense(512, activation="relu", name=name+"/d1ftn")
-        self.d2ftn = Dense(256, activation="relu", name=name+"/d2ftn")
+        self.d1ftn = Dense(512, activation="relu", name=name+"/d1ftn", trainable=trainable)
+        self.d2ftn = Dense(256, activation="relu", name=name+"/d2ftn", trainable=trainable)
         bias4 = np.eye(64).flatten().astype(np.float32)
-        self.d3ftn = Dense(64 * 64, weights=[np.zeros([256, 64 * 64]), bias4], name=name + "/d3ftn")
+        self.d3ftn = Dense(64 * 64, weights=[np.zeros([256, 64 * 64]), bias4], name=name + "/d3ftn", trainable=trainable)
 
         self.c3g = Conv1D(
             filters=64,

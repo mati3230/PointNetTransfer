@@ -66,10 +66,13 @@ class SeSaPointNet(BaseClassifier):
             check_numerics=check_numerics,
             initializer=initializer)
 
-    def get_vars(self, net_only=False):
-        vars_ = self.net.get_vars()
-        if net_only:
-            return vars_
+    def get_vars(self, net_only=False, head_only=False):
+        if not head_only:
+            vars_ = self.net.get_vars()
+            if net_only:
+                return vars_
+        else:
+            vars_ = []
         vars_.extend(self.bn1.trainable_weights)
         vars_.extend(self.bn2.trainable_weights)
         vars_.extend(self.bn1.non_trainable_weights)
