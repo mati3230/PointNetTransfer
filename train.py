@@ -161,6 +161,39 @@ def main():
     test_step = 0
 
     while n_epoch < max_epoch:
+        if n_epoch % test_interval == 0:
+            current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+            net.save(directory="./models/" + args.dataset, filename="pointnet_" + current_time, net_only=False)
+            
+            accs = []
+            n_acc = t_labels.shape[0] * t_labels.shape[1] * n_t_batches
+            ious = []
+
+            for i in range(n_t_batches):
+                t_blocks, t_labels = load_batch(i, test_idxs, block_dir, t_blocks, t_labels, batch_size)
+                t, pred = net(t_blocks, training=False)
+                pred = tf.nn.softmax(pred)
+                pred = pred.numpy()
+                pred = np.argmax(pred, axis=-1)
+                acc = 0
+                for c in range(n_classes):
+                    TP = np.sum((t_labels == c) & (pred == c))
+                    FP = np.sum((t_labels != c) & (pred == c))
+                    FN = np.sum((t_labels == c) & (pred != c))
+
+                    n = TP
+                    d = float(TP + FP + FN + 1e-12)
+
+                    iou = np.divide(n, d)
+                    ious.append(iou)
+
+                    accs.append(TP / n_acc)
+
+            with train_summary_writer.as_default():
+                tf.summary.scalar("test/overall_acc", np.sum(accs), step=test_step)
+                tf.summary.scalar("test/mIoU", np.mean(ious), step=test_step)
+            train_summary_writer.flush()
+            test_step += 1
         for i in range(n_batches):
             with tf.GradientTape() as tape:
                 blocks, labels = load_batch(i, train_idxs, block_dir, blocks, labels, batch_size)
@@ -209,39 +242,6 @@ def main():
                 tf.summary.scalar("train/global_norm", global_norm, step=train_step)
             train_summary_writer.flush()
             train_step += 1
-        if n_epoch % test_interval == 0:
-            current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-            net.save(directory="./models/" + args.dataset, filename="pointnet_" + current_time, net_only=False)
-            
-            accs = []
-            n_acc = t_labels.shape[0] * t_labels.shape[1] * n_t_batches
-            ious = []
-
-            for i in range(n_t_batches):
-                t_blocks, t_labels = load_batch(i, test_idxs, block_dir, t_blocks, t_labels, batch_size)
-                t, pred = net(t_blocks, training=False)
-                pred = tf.nn.softmax(pred)
-                pred = pred.numpy()
-                pred = np.argmax(pred, axis=-1)
-                acc = 0
-                for c in range(n_classes):
-                    TP = np.sum((t_labels == c) & (pred == c))
-                    FP = np.sum((t_labels != c) & (pred == c))
-                    FN = np.sum((t_labels == c) & (pred != c))
-
-                    n = TP
-                    d = float(TP + FP + FN + 1e-12)
-
-                    iou = np.divide(n, d)
-                    ious.append(iou)
-
-                    accs.append(TP / n_acc)
-
-            with train_summary_writer.as_default():
-                tf.summary.scalar("test/overall_acc", np.sum(accs), step=test_step)
-                tf.summary.scalar("test/mIoU", np.mean(ious), step=test_step)
-            train_summary_writer.flush()
-            test_step += 1
         n_epoch += 1
 
 
