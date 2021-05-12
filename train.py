@@ -160,11 +160,6 @@ def main():
     train_step = 0
     test_step = 0
 
-
-    gt_classes = np.zeros((n_classes, ), dtype=np.int32)
-    positive_classes = np.zeros((n_classes, ), dtype=np.int32)
-    tp_classes = np.zeros((n_classes, ), dtype=np.int32)
-
     while n_epoch < max_epoch:
         for i in range(n_batches):
             with tf.GradientTape() as tape:
@@ -218,40 +213,33 @@ def main():
             current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
             net.save(directory="./models/" + args.dataset, filename="pointnet_" + current_time, net_only=False)
             
-            acc = 0
-            
-            gt_classes[:] = 0
-            positive_classes[:] = 0
-            tp_classes[:] = 0
+            accs = []
+            n_acc = t_labels.shape[0] * t_labels.shape[1] * n_t_batches
+            ious = []
 
             for i in range(n_t_batches):
                 t_blocks, t_labels = load_batch(i, test_idxs, block_dir, t_blocks, t_labels, batch_size)
                 t, pred = net(t_blocks, training=False)
                 pred = tf.nn.softmax(pred)
                 pred = pred.numpy()
-                classes = np.argmax(pred, axis=-1)
+                pred = np.argmax(pred, axis=-1)
+                acc = 0
+                for c in range(n_classes):
+                    TP = np.sum((t_labels == c) & (pred == c))
+                    FP = np.sum((t_labels != c) & (pred == c))
+                    FN = np.sum((t_labels == c) & (pred != c))
 
-                tp_idxs = np.where(classes == t_labels)
-                
-                n_points = t_labels.shape[0]*t_labels.shape[1]
-                acc += tp_idxs[0].shape[0] / n_points
+                    n = TP
+                    d = float(TP + FP + FN + 1e-12)
 
-                gt_classes += update_stats(stat_vec=gt_classes, t_uni=t_labels)
-                positive_classes += update_stats(stat_vec=positive_classes, t_uni=classes)
-                
-                tp_vec = classes[tp_idxs[0], tp_idxs[1]]
-                tp_classes += update_stats(stat_vec=tp_classes, t_uni=tp_vec)
+                    iou = np.divide(n, d)
+                    ious.append(iou)
 
-            acc /= n_t_batches
-
-            d = gt_classes + positive_classes - tp_classes
-            d[d == 0] = 1
-            iou = tp_classes / d
-            iou[d == 0] = 0
+                    accs.append(TP / n_acc)
 
             with train_summary_writer.as_default():
-                tf.summary.scalar("test/mean_acc", acc, step=test_step)
-                tf.summary.scalar("test/mean_iou", np.sum(iou) / 13, step=test_step)
+                tf.summary.scalar("test/overall_acc", np.sum(accs), step=test_step)
+                tf.summary.scalar("test/mIoU", np.mean(ious), step=test_step)
             train_summary_writer.flush()
             test_step += 1
         n_epoch += 1
