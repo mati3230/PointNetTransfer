@@ -105,7 +105,7 @@ def main():
     train_p = args.train_p
     train_n = math.floor(train_p * len(all_idxs))
     test_n = len(all_idxs) - train_n
-    # train_n = test_n = 16
+    train_n = test_n = 16
     print("Use {0} blocks for training and {1} blocks for testing".format(train_n, test_n))
     train_idxs = np.random.choice(all_idxs, size=train_n, replace=False)
     test_idxs = np.delete(all_idxs, train_idxs)
@@ -162,8 +162,6 @@ def main():
 
     while n_epoch < max_epoch:
         if n_epoch % test_interval == 0:
-            current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-            net.save(directory="./models/" + args.dataset, filename="pointnet_" + current_time, net_only=False)
             
             accs = []
             n_acc = t_labels.shape[0] * t_labels.shape[1] * n_t_batches
@@ -194,6 +192,9 @@ def main():
                 tf.summary.scalar("test/mIoU", np.mean(ious), step=test_step)
             train_summary_writer.flush()
             test_step += 1
+            
+            current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+            net.save(directory="./models/" + args.dataset, filename="pointnet_" + current_time, net_only=False)
         for i in range(n_batches):
             with tf.GradientTape() as tape:
                 blocks, labels = load_batch(i, train_idxs, block_dir, blocks, labels, batch_size)
