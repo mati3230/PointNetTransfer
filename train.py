@@ -67,10 +67,31 @@ def load_batch(i, train_idxs, block_dir, blocks, labels, batch_size):
         labels[k] = b_labels
     return blocks, labels
 
+
 def update_stats(stat_vec, t_uni):
     unis, counts = np.unique(t_uni, return_counts=True)
     stat_vec[unis] += counts
     return stat_vec
+
+
+def freeze(vars_, grads, var_idxs):
+    if var_idxs is None:
+        var_idxs = []
+        for z in range(len(vars_)):
+            var_name = vars_[z].name
+            if var_name in ft_net_vars:
+                var_idxs.append(z)
+        # print(var_idxs)
+    tmp_vars = []
+    tmp_grads = []
+    for z in range(len(vars_)):
+        if z in var_idxs:
+            continue
+        tmp_vars.append(vars_[z])
+        tmp_grads.append(grads[z])
+    vars_ = tmp_vars
+    grads = tmp_grads
+    return vars_, grads
 
 
 def main():
@@ -89,6 +110,7 @@ def main():
     parser.add_argument("--load", type=bool, default=False, help="Load feature detector.")
     parser.add_argument("--model_file", type=str, help="Name of the feature detector that should be loaded.")
     parser.add_argument("--model_dir", type=str, help="Directory of the feature detector that should be loaded.")
+    parser.add_argument("--freeze", type=bool, default=False, help="Freeze weights of the feature detector.")
     args = parser.parse_args()
 
     seed = args.seed
@@ -202,29 +224,10 @@ def main():
                 loss, seg_loss, mat_diff_loss = get_loss(seg_pred=pred, seg=labels, t=t)
                 vars_ = tape.watched_variables()
                 grads = tape.gradient(loss, vars_)
-                """for z in range(len(grads)):
-                    print(vars_[z].name, tf.reduce_sum(grads[z]), tf.reduce_sum(vars_[z]), vars_[z].trainable)
-                print("*---------------------------*")"""
-                # print(grads)
-                """"
-                if args.load:
-                    if var_idxs is None:
-                        var_idxs = []
-                        for z in range(len(vars_)):
-                            var_name = vars_[z].name
-                            if var_name in ft_net_vars:
-                                var_idxs.append(z)
-                        # print(var_idxs)
-                    tmp_vars = []
-                    tmp_grads = []
-                    for z in range(len(vars_)):
-                        if z in var_idxs:
-                            continue
-                        tmp_vars.append(vars_[z])
-                        tmp_grads.append(grads[z])
-                    vars_ = tmp_vars
-                    grads = tmp_grads
-                """
+
+                if args.freeze:
+                    vars_, grads = freeze(vars_=vars_, grads=grads, var_idxs=var_idxs)
+
                 global_norm = tf.linalg.global_norm(grads)
                 if global_norm_t > 0:
                     grads, _ = tf.clip_by_global_norm(
@@ -232,12 +235,6 @@ def main():
                         global_norm_t,
                         use_norm=global_norm)
                 optimizer.apply_gradients(zip(grads, vars_))
-                """
-                for z in range(len(grads)):
-                    print(vars_[z].name, tf.reduce_sum(vars_[z]))
-                print("*---------------------------*")
-                return
-                """
             with train_summary_writer.as_default():
                 tf.summary.scalar("train/loss", loss, step=train_step)
                 tf.summary.scalar("train/seg_loss", seg_loss, step=train_step)
