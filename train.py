@@ -206,12 +206,7 @@ def main():
                     print(vars_[z].name, tf.reduce_sum(grads[z]), tf.reduce_sum(vars_[z]), vars_[z].trainable)
                 print("*---------------------------*")"""
                 # print(grads)
-                global_norm = tf.linalg.global_norm(grads)
-                if global_norm_t > 0:
-                    grads, _ = tf.clip_by_global_norm(
-                        grads,
-                        global_norm_t,
-                        use_norm=global_norm)
+                """"
                 if args.load:
                     if var_idxs is None:
                         var_idxs = []
@@ -229,6 +224,13 @@ def main():
                         tmp_grads.append(grads[z])
                     vars_ = tmp_vars
                     grads = tmp_grads
+                """
+                global_norm = tf.linalg.global_norm(grads)
+                if global_norm_t > 0:
+                    grads, _ = tf.clip_by_global_norm(
+                        grads,
+                        global_norm_t,
+                        use_norm=global_norm)
                 optimizer.apply_gradients(zip(grads, vars_))
                 """
                 for z in range(len(grads)):
