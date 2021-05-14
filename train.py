@@ -111,6 +111,7 @@ def main():
     parser.add_argument("--model_file", type=str, help="Name of the feature detector that should be loaded.")
     parser.add_argument("--model_dir", type=str, help="Directory of the feature detector that should be loaded.")
     parser.add_argument("--freeze", type=bool, default=False, help="Freeze weights of the feature detector.")
+    parser.add_argument("--transfer_train_p", type=float, default=1.0, help="Use less train examples.")
     args = parser.parse_args()
 
     seed = args.seed
@@ -128,6 +129,8 @@ def main():
     train_n = math.floor(train_p * len(all_idxs))
     test_n = len(all_idxs) - train_n
     # train_n = test_n = 16
+    if args.transfer_train_p < 1.0:
+        train_n = math.floor(args.transfer_train_p * len(all_idxs))
     print("Use {0} blocks for training and {1} blocks for testing".format(train_n, test_n))
     train_idxs = np.random.choice(all_idxs, size=train_n, replace=False)
     test_idxs = np.delete(all_idxs, train_idxs)
