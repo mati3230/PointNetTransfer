@@ -124,13 +124,14 @@ def main():
     np.random.seed(seed)
 
     block_dirs = os.listdir(block_dir)
-    all_idxs = np.arange(len(block_dirs)).astype(np.int32)
+    if args.transfer_train_p < 1.0:
+        size = math.floor(args.transfer_train_p * len(block_dirs))
+        all_idxs = np.arange(size).astype(np.int32)
+    else:
+        all_idxs = np.arange(len(block_dirs)).astype(np.int32)
     train_p = args.train_p
     train_n = math.floor(train_p * len(all_idxs))
     test_n = len(all_idxs) - train_n
-    # train_n = test_n = 16
-    if args.transfer_train_p < 1.0:
-        train_n = math.floor(args.transfer_train_p * len(all_idxs))
     print("Use {0} blocks for training and {1} blocks for testing".format(train_n, test_n))
     train_idxs = np.random.choice(all_idxs, size=train_n, replace=False)
     test_idxs = np.delete(all_idxs, train_idxs)

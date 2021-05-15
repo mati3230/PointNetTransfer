@@ -34,7 +34,7 @@ def file_exists(filepath):
 
 
 def load_scene(dataset, scene):
-    filename = "./" + dataset + "_Scenes/" + scene + "/P.npz"
+    filename = "./Scenes/" + dataset + "/" + scene + "/P.npz"
     data = np.load(filename)
     P = data["P"]
     labels = data["labels"]
