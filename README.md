@@ -16,6 +16,7 @@ pip install -r requirements.txt
 The next step is to prepare the dataset for the training. Apply the following commands
 
 *python s3dis_prepare.py*
+
 *python s3dis_prepare.py --mode blocks*
 
 A directory *./Scenes/S3DIS* will be created where the blocks of the point clouds and their corresponding labels are stored.
