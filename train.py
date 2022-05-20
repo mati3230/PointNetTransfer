@@ -138,6 +138,8 @@ def main():
         all_idxs = np.arange(size).astype(np.int32)
     else:
         all_idxs = np.arange(len(block_dirs)).astype(np.int32)
+    if all_idxs.shape[0] < batch_size:
+        raise Exception("Batch size ({0}) is greater than the number of training examples ({1}).".format(batch_size, all_idxs.shape[0]))
     train_p = args.train_p
     train_n = math.floor(train_p * len(all_idxs))
     test_n = len(all_idxs) - train_n
