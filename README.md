@@ -22,11 +22,32 @@ After that, the training can be started by calling
 
 *python train.py*
 
-which will train a semantic segmentation PointNet from scratch. 
+which will train a semantic segmentation PointNet from scratch. Call
+
+*python train.py -h*
+
+in order to print the available command line options.
 
 ## Transfer Learning
 
-TODO
+The command line options that are relevant for the transfer learning are:
+
+* load: If True, a model which is located at model_dir/model_file (see next two options) will be loaded.
+* model_dir: Directory of the model that should be loaded.
+* model_file: File name of the model that should be loaded.
+* freeze: If True, the weights of the PointNet feature extractor will not be updated during the training.
+
+### Example
+
+Assume you already trained a model with dataset A which is located at model_dir/model_file with 
+
+*python train.py --dataset A*
+
+and you want to use the PointNet feature extractor of that model in order to train on dataset B. To do so, call, e.g.,
+
+*python train.py --dataset B --load True --model_dir Path/To/Model --model_file Filename --freeze True*
+
+which only changes the last layers of the model in the training. 
 
 ## DATASETS
 
