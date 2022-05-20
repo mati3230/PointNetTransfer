@@ -19,7 +19,7 @@ The next step is to prepare the dataset for the training. Apply the following co
 
 *python s3dis_prepare.py --mode blocks*
 
-A directory *./Scenes/S3DIS* will be created where the blocks of the point clouds and their corresponding labels are stored.
+A directory *./Scenes/S3DIS* will be created where the point clouds and their corresponding labels are stored. The blocks which are used to train the PointNet are stored in *Blocks/S3DIS*. 
 After that, the training can be started by calling
 
 *python train.py*
