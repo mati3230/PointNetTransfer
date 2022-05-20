@@ -9,6 +9,7 @@ from sesa_pointnet import SeSaPointNet
 
 
 def get_loss(seg_pred, seg, t, reg_f=1e-3, check_numerics=True):
+    # loss calculation
     seg = seg.astype(np.int32)
     ce = tf.nn.sparse_softmax_cross_entropy_with_logits(
                     labels=seg, logits=seg_pred)
@@ -30,6 +31,7 @@ def get_loss(seg_pred, seg, t, reg_f=1e-3, check_numerics=True):
 
 
 def load_block(block_dir, name):
+    # load a block of the point cloud
     filename = block_dir + "/" + str(name) + ".npz"
     data = np.load(filename)
     block = data["block"]
@@ -54,6 +56,7 @@ def load_block(block_dir, name):
 
 
 def load_batch(i, train_idxs, block_dir, blocks, labels, batch_size):
+    # load a batch of blocks and their corresponding labels
     j = i * batch_size
     idxs = train_idxs[j:j+batch_size]
     for k in range(idxs.shape[0]):
@@ -74,7 +77,8 @@ def update_stats(stat_vec, t_uni):
     return stat_vec
 
 
-def freeze(vars_, grads, var_idxs):
+def freeze(vars_, grads, var_idxs, ft_net_vars):
+    # filter some weights with the names 'ft_net_vars' from the weight update
     if var_idxs is None:
         var_idxs = []
         for z in range(len(vars_)):
@@ -121,8 +125,13 @@ def main():
     test_interval = args.test_interval
     block_dir = "Blocks/" + args.dataset
     n_classes = args.n_classes
+    if args.dataset == "S3DIS":
+        n_classes = 14
+    elif args.dataset == "PCG":
+        n_classes = 12
     np.random.seed(seed)
 
+    # train test split
     block_dirs = os.listdir(block_dir)
     if args.transfer_train_p < 1.0:
         size = math.floor(args.transfer_train_p * len(block_dirs))
@@ -137,19 +146,21 @@ def main():
     test_idxs = np.delete(all_idxs, train_idxs)
     np.random.shuffle(train_idxs)
 
+    # determine the number of batches
     n_batches = math.floor(train_n / batch_size)
     n_t_batches = math.floor(test_n / batch_size)
 
     n_epoch = 0
     max_epoch = args.max_epoch
 
+    # prepare containers to store the batches
     b, l = load_block(block_dir, 0)
     blocks = np.zeros((batch_size, ) + b.shape, np.float32)
     labels = np.zeros((batch_size, ) + (l.shape[0], ), np.uint8)
     t_blocks = np.zeros((batch_size, ) + b.shape, np.float32)
     t_labels = np.zeros((batch_size, ) + (l.shape[0], ), np.uint8)
 
-    if args.load:
+    if args.load: # load a pretrained network
         net = SeSaPointNet(
             name="SeSaPN",
             n_classes=n_classes,
@@ -164,13 +175,14 @@ def main():
         net.reset()
         net.load(directory=args.model_dir, filename=args.model_file, net_only=True)
         print("model loaded")
+        # get vars from PointNet which is a part of SeSaPointNet
         ft_net_vars_tmp = net.net.get_vars()
         ft_net_vars = []
         var_idxs = None
         for z in range(len(ft_net_vars_tmp)):
             ft_net_vars.append(ft_net_vars_tmp[z].name)
         #print(ft_net_vars)
-    else:
+    else: # train a network from scratch
         net = SeSaPointNet(
             name="SeSaPN",
             n_classes=n_classes,
@@ -179,6 +191,7 @@ def main():
             check_numerics=args.check_numerics,
             initializer=args.initializer,
             trainable_net=True)
+    # prepare training and logging
     optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     log_dir = "./logs/" + current_time
@@ -186,34 +199,37 @@ def main():
     train_step = 0
     test_step = 0
 
+    # training and testing
     while n_epoch < max_epoch:
-        if n_epoch % test_interval == 0:
-            
+        if n_epoch % test_interval == 0: # test step
             accs = []
+            # number of accuracy calculations in the test phase
             n_acc = t_labels.shape[0] * t_labels.shape[1] * n_t_batches
+            # intersection over unions (ious)
             ious = []
 
-            for i in range(n_t_batches):
+            for i in range(n_t_batches): # execute n_t_batches test steps
                 t_blocks, t_labels = load_batch(i, test_idxs, block_dir, t_blocks, t_labels, batch_size)
                 t, pred = net(t_blocks, training=False)
                 pred = tf.nn.softmax(pred)
                 pred = pred.numpy()
                 pred = np.argmax(pred, axis=-1)
                 acc = 0
-                for c in range(n_classes):
-                    TP = np.sum((t_labels == c) & (pred == c))
-                    FP = np.sum((t_labels != c) & (pred == c))
-                    FN = np.sum((t_labels == c) & (pred != c))
+                for c in range(n_classes): # calculate performance metrics for each class
+                    TP = np.sum((t_labels == c) & (pred == c)) # true positives
+                    FP = np.sum((t_labels != c) & (pred == c)) # false positives
+                    FN = np.sum((t_labels == c) & (pred != c)) # false negatives
 
                     n = TP
                     d = float(TP + FP + FN + 1e-12)
 
-                    iou = np.divide(n, d)
+                    iou = np.divide(n, d) # intersection over union (iou)
                     ious.append(iou)
-
+                    # average the accuracy
                     accs.append(TP / n_acc)
-
+            # log tensorboard
             with train_summary_writer.as_default():
+                # log the average statistics
                 tf.summary.scalar("test/overall_acc", np.sum(accs), step=test_step)
                 tf.summary.scalar("test/mIoU", np.mean(ious), step=test_step)
             train_summary_writer.flush()
@@ -221,24 +237,32 @@ def main():
             
             current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
             net.save(directory="./models/" + args.dataset, filename="pointnet_" + current_time, net_only=False)
-        for i in range(n_batches):
+        for i in range(n_batches): # execute n_batches train steps
             with tf.GradientTape() as tape:
                 blocks, labels = load_batch(i, train_idxs, block_dir, blocks, labels, batch_size)
                 t, pred = net(blocks, training=True)
                 loss, seg_loss, mat_diff_loss = get_loss(seg_pred=pred, seg=labels, t=t)
+                # loss: The overall loss that contains the seg_loss and the mat_diff_loss
+                # seg_loss: Cross entropy loss for the semantic segmentation
+                # mat_diff_loss: Loss of the T-Net which part of the PointNet feature exrtactor
+
+                # get the variables and gradients
                 vars_ = tape.watched_variables()
                 grads = tape.gradient(loss, vars_)
 
-                if args.freeze:
-                    vars_, grads = freeze(vars_=vars_, grads=grads, var_idxs=var_idxs)
+                if args.freeze: # skip the weigths of the PointNet feature extractor  
+                    vars_, grads = freeze(vars_=vars_, grads=grads, var_idxs=var_idxs, ft_net_vars=ft_net_vars)
 
+                # Threshold operation on the gradients 
                 global_norm = tf.linalg.global_norm(grads)
                 if global_norm_t > 0:
                     grads, _ = tf.clip_by_global_norm(
                         grads,
                         global_norm_t,
                         use_norm=global_norm)
+                # Weight update
                 optimizer.apply_gradients(zip(grads, vars_))
+            # log tensorboard
             with train_summary_writer.as_default():
                 tf.summary.scalar("train/loss", loss, step=train_step)
                 tf.summary.scalar("train/seg_loss", seg_loss, step=train_step)
