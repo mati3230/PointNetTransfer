@@ -2,6 +2,7 @@ import os
 import numpy as np
 import glob
 import open3d as o3d
+from tqdm import tqdm
 
 
 def mkdir(directory):
@@ -237,15 +238,22 @@ def point_label_to_obj(input_filename, out_filename, label_color=True, easy_view
     fout.close()
 
 
+def get_labelled_blocks(scene, dataset, num_points=4096):
+    P, labels = load_scene(dataset=dataset, scene=scene)
+    blocks, b_labels, sample_indices = room2blocks(data=P, label=labels, num_point=num_points)
+    return blocks, b_labels, P, labels, sample_indices
+
+
 def create_blocks(dataset, num_points=4096):
     block_dir = "./Blocks/" + dataset
     mkdir(block_dir)
     scenes = os.listdir("./Scenes/" + dataset)
     block_n = 0
-    for i in range(len(scenes)):
+    for i in tqdm(range(len(scenes)), desc="Blocks"):
         scene = scenes[i]
-        P, labels = load_scene(dataset=dataset, scene=scene)
-        blocks, b_labels = room2blocks(data=P, label=labels, num_point=num_points)
+        #P, labels = load_scene(dataset=dataset, scene=scene)
+        #blocks, b_labels = room2blocks(data=P, label=labels, num_point=num_points)
+        blocks, b_labels, _, _, _ = get_labelled_blocks(scene=scene, dataset=dataset, num_points=4096)
         for k in range(blocks.shape[0]):
             block = blocks[k]
             b_label = b_labels[k]
@@ -278,7 +286,7 @@ def sample_data(data, num_sample):
 def sample_data_label(data, label, num_sample):
     new_data, sample_indices = sample_data(data, num_sample)
     new_label = label[sample_indices]
-    return new_data, new_label
+    return new_data, new_label, sample_indices
 
 def room2blocks(data, label, num_point, block_size=1.0, stride=1.0,
                 random_sample=False, sample_num=None, sample_aug=1):
@@ -329,6 +337,7 @@ def room2blocks(data, label, num_point, block_size=1.0, stride=1.0,
     # Collect blocks
     block_data_list = []
     block_label_list = []
+    sample_indices_list = []
     idx = 0
     for idx in range(len(xbeg_list)):
        xbeg = xbeg_list[idx]
@@ -343,13 +352,15 @@ def room2blocks(data, label, num_point, block_size=1.0, stride=1.0,
        block_label = label[cond]
 
        # randomly subsample data
-       block_data_sampled, block_label_sampled = \
+       block_data_sampled, block_label_sampled, sample_indices = \
            sample_data_label(block_data, block_label, num_point)
        block_data_list.append(np.expand_dims(block_data_sampled, 0))
        block_label_list.append(np.expand_dims(block_label_sampled, 0))
+       sample_indices_list.append(np.expand_dims(sample_indices, 0))
 
     return np.concatenate(block_data_list, 0), \
-           np.concatenate(block_label_list, 0)
+           np.concatenate(block_label_list, 0), \
+           np.concatenate(sample_indices_list, 0)
 
 
 def room2blocks_plus(data_label, num_point, block_size, stride,

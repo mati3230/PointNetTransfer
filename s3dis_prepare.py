@@ -62,7 +62,7 @@ def prepare_scenes(dataset_name):
         area_dir = s3dis_dir + "/" + dir
         #for scene in os.listdir(area_dir):
         scenes = os.listdir(area_dir)
-        for i in tqdm(range(len(scenes)), desc="Blocks {0}".format(dir)):
+        for i in tqdm(range(len(scenes)), desc="Point Cloud {0}".format(dir)):
             scene = scenes[i]
             scene_name = "Area" + dir[-1] + "_" + scene
             # print(scene_name)
@@ -134,7 +134,7 @@ def main():
         "--mode",
         type=str,
         default="precalc",
-        help="options: precalc, visualize_all, visualize_single")
+        help="options: precalc, blocks, visualize_single, visualize_all")
     parser.add_argument(
         "--scene",
         type=str,
