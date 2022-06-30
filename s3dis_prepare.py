@@ -1,6 +1,7 @@
 import argparse
 import os
 import numpy as np
+from tqdm import tqdm
 from utils import mkdir, file_exists, render_point_cloud, create_blocks, load_scene
 
 
@@ -37,6 +38,8 @@ def prepare_scenes(dataset_name):
     obj_label_nr = 0
 
     for dir in os.listdir(s3dis_dir):
+        if dir == ".DS_Store":
+            continue
         area_dir = s3dis_dir + "/" + dir
         for scene in os.listdir(area_dir):
             scene_dir = area_dir + "/" + scene + "/Annotations"
@@ -54,8 +57,13 @@ def prepare_scenes(dataset_name):
     print(obj_label_nr-1, "classes found")
 
     for dir in os.listdir(s3dis_dir):
+        if dir == ".DS_Store":
+            continue
         area_dir = s3dis_dir + "/" + dir
-        for scene in os.listdir(area_dir):
+        #for scene in os.listdir(area_dir):
+        scenes = os.listdir(area_dir)
+        for i in tqdm(range(len(scenes)), desc="Blocks {0}".format(dir)):
+            scene = scenes[i]
             scene_name = "Area" + dir[-1] + "_" + scene
             # print(scene_name)
             n_scene_dir = "./Scenes/S3DIS/" + scene_name
