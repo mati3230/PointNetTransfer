@@ -245,7 +245,7 @@ def get_labelled_blocks(scene, dataset, num_points=4096):
 
 
 def get_blocks(P, num_points=4096):
-    blocks, sample_indices = room2blocks(data=P, label=None, num_point=num_points)
+    blocks, sample_indices = room2samples(data=P, label=None, sample_num_point=num_points)
     return blocks, sample_indices
 
 
@@ -458,23 +458,32 @@ def room2samples(data, label, sample_num_point):
     order = np.arange(N)
     np.random.shuffle(order)
     data = data[order, :]
-    label = label[order]
+    wo_label = label is None
+    if not wo_label:
+        label = label[order]
 
     batch_num = int(np.ceil(N / float(sample_num_point)))
     sample_datas = np.zeros((batch_num, sample_num_point, 6))
-    sample_labels = np.zeros((batch_num, sample_num_point, 1))
-
+    if not wo_label:
+        sample_labels = np.zeros((batch_num, sample_num_point, 1))
+    sample_indices_list = []
     for i in range(batch_num):
         beg_idx = i*sample_num_point
         end_idx = min((i+1)*sample_num_point, N)
         num = end_idx - beg_idx
+        sample_indices = np.arange(start=beg_idx, stop=end_idx, dtype=np.int32)
+        sample_indices_list.append(sample_indices)
         sample_datas[i,0:num,:] = data[beg_idx:end_idx, :]
-        sample_labels[i,0:num,0] = label[beg_idx:end_idx]
+        if not wo_label:
+            sample_labels[i,0:num,0] = label[beg_idx:end_idx]
         if num < sample_num_point:
             makeup_indices = np.random.choice(N, sample_num_point - num)
             sample_datas[i,num:,:] = data[makeup_indices, :]
-            sample_labels[i,num:,0] = label[makeup_indices]
-    return sample_datas, sample_labels
+            if not wo_label:
+                sample_labels[i,num:,0] = label[makeup_indices]
+    if wo_label:
+        return sample_datas, sample_indices_list
+    return sample_datas, sample_labels, sample_indices_list
 
 def room2samples_plus_normalized(data_label, num_point):
     """ room2sample, with input filename and RGB preprocessing.
