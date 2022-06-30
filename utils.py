@@ -244,6 +244,11 @@ def get_labelled_blocks(scene, dataset, num_points=4096):
     return blocks, b_labels, P, labels, sample_indices
 
 
+def get_blocks(P, num_points=4096):
+    blocks, sample_indices = room2blocks(data=P, label=None, num_point=num_points)
+    return blocks, sample_indices
+
+
 def create_blocks(dataset, num_points=4096):
     block_dir = "./Blocks/" + dataset
     mkdir(block_dir)
@@ -288,6 +293,11 @@ def sample_data_label(data, label, num_sample):
     new_label = label[sample_indices]
     return new_data, new_label, sample_indices
 
+def sample_wo_label(data, num_sample):
+    new_data, sample_indices = sample_data(data, num_sample)
+    return new_data, sample_indices
+
+
 def room2blocks(data, label, num_point, block_size=1.0, stride=1.0,
                 random_sample=False, sample_num=None, sample_aug=1):
     """ Prepare block training data.
@@ -312,6 +322,8 @@ def room2blocks(data, label, num_point, block_size=1.0, stride=1.0,
     assert(stride<=block_size)
 
     limit = np.amax(data, 0)[0:3]
+
+    wo_label = label is None
 
     # Get the corner location for our sampling blocks
     xbeg_list = []
@@ -349,15 +361,19 @@ def room2blocks(data, label, num_point, block_size=1.0, stride=1.0,
            continue
 
        block_data = data[cond, :]
-       block_label = label[cond]
-
-       # randomly subsample data
-       block_data_sampled, block_label_sampled, sample_indices = \
-           sample_data_label(block_data, block_label, num_point)
+       if wo_label:
+           block_data_sampled, sample_indices = sample_wo_label(block_data, num_point)
+       else: # with label
+           block_label = label[cond]
+           # randomly subsample data
+           block_data_sampled, block_label_sampled, sample_indices = \
+               sample_data_label(block_data, block_label, num_point)
+           block_label_list.append(np.expand_dims(block_label_sampled, 0))
        block_data_list.append(np.expand_dims(block_data_sampled, 0))
-       block_label_list.append(np.expand_dims(block_label_sampled, 0))
        sample_indices_list.append(np.expand_dims(sample_indices, 0))
-
+    if wo_label:
+       return np.concatenate(block_data_list, 0), \
+              np.concatenate(sample_indices_list, 0)    
     return np.concatenate(block_data_list, 0), \
            np.concatenate(block_label_list, 0), \
            np.concatenate(sample_indices_list, 0)
