@@ -1,0 +1,4 @@
+numpy>=1.19.5
+tensorflow>=2.3
+glob2
+open3d
