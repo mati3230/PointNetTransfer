@@ -12,7 +12,9 @@ class PointNet(BaseNet):
             seed=None,
             check_numerics=False,
             initializer="glorot_uniform",
-            n_points=4096):
+            n_points=4096,
+            p_dim=3
+            ):
         super().__init__(
             name=name,
             trainable=trainable,
@@ -20,6 +22,7 @@ class PointNet(BaseNet):
             check_numerics=check_numerics,
             initializer=initializer)
         self.n_points = n_points
+        self.p_dim = p_dim
 
         self.bn1g = BatchNormalization(name=name+"/bn1g")
         self.bn2g = BatchNormalization(name=name+"/bn2g")
@@ -42,7 +45,7 @@ class PointNet(BaseNet):
 
         self.c1itn = Conv2D(
             filters=64,
-            kernel_size=[1, 6],
+            kernel_size=[1, self.p_dim],
             activation="relu",
             name=name+"/c1itn",
             trainable=trainable,
@@ -64,8 +67,8 @@ class PointNet(BaseNet):
         self.mp1itn = MaxPool1D(name=name + "/mp1itn", pool_size=self.n_points)
         self.d1itn = Dense(512, activation="relu", name=name+"/d1itn", trainable=trainable)
         self.d2itn = Dense(256, activation="relu", name=name+"/d2itn", trainable=trainable)
-        bias3 = np.eye(6).flatten().astype(np.float32)
-        self.d3itn = Dense(36, weights=[np.zeros([256, 36]), bias3], name=name+"/d3itn", trainable=trainable)
+        bias3 = np.eye(self.p_dim).flatten().astype(np.float32)
+        self.d3itn = Dense(self.p_dim**2, weights=[np.zeros([256, self.p_dim**2]), bias3], name=name+"/d3itn", trainable=trainable)
 
         self.c1g = Conv1D(
             filters=64,
@@ -132,7 +135,7 @@ class PointNet(BaseNet):
             kernel_initializer=initializer)
         self.mp1g = MaxPool1D(name=name + "/mp1g", pool_size=self.n_points)
 
-        self.r1itn = Reshape((6, 6), name=name+"/r1itn")
+        self.r1itn = Reshape((self.p_dim, self.p_dim), name=name+"/r1itn")
         self.r1ftn = Reshape((64, 64), name=name+"/r2itn")
 
     def feature_t_net(self, g, training):

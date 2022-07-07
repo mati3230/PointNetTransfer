@@ -8,11 +8,15 @@ class SeSaPointNet(BaseClassifier):
             self,
             name,
             n_classes,
+            n_points,
             seed=None,
             trainable=True,
             check_numerics=False,
             initializer="glorot_uniform",
-            trainable_net=True):
+            trainable_net=True,
+            p_dim=3):
+        self.n_points = n_points
+        self.p_dim = p_dim
         super().__init__(name=name,
                 n_classes=n_classes,
                 seed=seed,
@@ -64,7 +68,9 @@ class SeSaPointNet(BaseClassifier):
             trainable=trainable,
             seed=seed,
             check_numerics=check_numerics,
-            initializer=initializer)
+            initializer=initializer,
+            n_points=self.n_points,
+            p_dim=self.p_dim)
 
     def get_vars(self, net_only=False, head_only=False):
         if not head_only:

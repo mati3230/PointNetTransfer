@@ -240,7 +240,10 @@ def point_label_to_obj(input_filename, out_filename, label_color=True, easy_view
 
 def get_labelled_blocks(scene, dataset, num_points=4096):
     P, labels = load_scene(dataset=dataset, scene=scene)
-    blocks, b_labels, sample_indices = room2blocks(data=P, label=labels, num_point=num_points)
+    #blocks, b_labels, sample_indices = room2blocks(data=P, label=labels, num_point=num_points)
+    #print(labels.shape)
+    labels = labels.reshape(labels.shape[0], )
+    blocks, b_labels, sample_indices = room2samples(data=P, label=labels, sample_num_point=num_points)
     return blocks, b_labels, P, labels, sample_indices
 
 
@@ -258,7 +261,7 @@ def create_blocks(dataset, num_points=4096):
         scene = scenes[i]
         #P, labels = load_scene(dataset=dataset, scene=scene)
         #blocks, b_labels = room2blocks(data=P, label=labels, num_point=num_points)
-        blocks, b_labels, _, _, _ = get_labelled_blocks(scene=scene, dataset=dataset, num_points=4096)
+        blocks, b_labels, _, _, _ = get_labelled_blocks(scene=scene, dataset=dataset, num_points=num_points)
         for k in range(blocks.shape[0]):
             block = blocks[k]
             b_label = b_labels[k]

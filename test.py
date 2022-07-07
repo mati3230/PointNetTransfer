@@ -52,6 +52,7 @@ def main():
     p_vec = -np.ones((P.shape[0], ), dtype=np.int32)
     for i in tqdm(range(blocks.shape[0]), desc="Classify Blocks", disable=True):
         block = blocks[i]
+        # TODO add preprocessing of block -- see train.py
         block_ = np.expand_dims(block, axis=0)
         indices = sample_indices[i]
         #"""
