@@ -148,7 +148,7 @@ def main():
     parser.add_argument(
         "--num_points",
         type=int,
-        default=1024,
+        default=4096,
         help="Number of points per block")
     args = parser.parse_args()
     print(args)

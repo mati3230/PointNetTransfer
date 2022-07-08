@@ -238,8 +238,10 @@ def sample_scene(pid, scenes, scannet_dir, upsampling, mscannet_dir, special_obj
         P = np.asarray(pcd.points)
         C = 255*np.asarray(pcd.colors)
         P = np.hstack((P, C))
-        xyz_mean = np.mean(P[:, :3], axis=0)
-        P[:, :3] = P[:, :3] - xyz_mean
+        xyz_min = np.min(P[:, :3], axis=0)
+        P[:, :3] = P[:, :3] - xyz_min
+
+        #m = np.max(np.sqrt(np.sum(pc**2, axis=1)))
 
         partition_vec = partition_vec.reshape(partition_vec.shape[0], )
         #print(partition_vec.shape)
@@ -333,7 +335,7 @@ def main():
     parser.add_argument(
         "--num_points",
         type=int,
-        default=1024,
+        default=4096,
         help="Number of points per block")
     args = parser.parse_args()
 

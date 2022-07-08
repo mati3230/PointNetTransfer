@@ -4,7 +4,7 @@ import math
 import datetime
 import argparse
 import os
-from scipy.spatial.transform import Rotation as R
+#from scipy.spatial.transform import Rotation as R
 from sesa_pointnet import SeSaPointNet
 # from utils import render_point_cloud
 
@@ -31,13 +31,13 @@ def get_loss(seg_pred, seg, t, reg_f=1e-3, check_numerics=True):
     return total, seg_loss, mat_diff_loss
 
 
-def load_block(block_dir, name, spatial_only=True):
+def load_block(block_dir, name, spatial_only=False):
     # load a block of the point cloud
     filename = block_dir + "/" + str(name) + ".npz"
     data = np.load(filename)
     block = data["block"]
     b_labels = data["labels"]
-
+    """
     # translate into the origin
     mean_block = np.mean(block[:, :3], axis=0)
     block[:, :3] -= mean_block
@@ -50,7 +50,7 @@ def load_block(block_dir, name, spatial_only=True):
     block[:, 3:] -= 0.5
     # scale point colors to [-1, 1]
     block[:, 3:] *= 2
-
+    """
     # render_point_cloud(block)
     if spatial_only:
         block = block[:, :3]
@@ -70,8 +70,17 @@ def load_batch(i, train_idxs, block_dir, blocks, labels, batch_size, apply_rando
         elif len(b_labels.shape) > 2:
             raise Exception("Unexpected shape of labels" + str(b_labels.shape))
         if apply_random_rotation:
-            rot = R.random().as_matrix()
-            block = np.matmul(block, rot)
+            #rot = R.random().as_matrix()
+            rotation_angle = np.random.uniform() * 2 * np.pi
+            cosval = np.cos(rotation_angle)
+            sinval = np.sin(rotation_angle)
+            rot = np.array([
+                    [cosval, 0, sinval],
+                    [0, 1, 0],
+                    [-sinval, 0, cosval]
+                ])
+            block[:, :3] = np.matmul(block[:, :3], rot)
+            block[:, 6:9] = np.matmul(block[:, 6:9], rot)
         blocks[k] = block
         labels[k] = b_labels
     return blocks, labels
@@ -122,12 +131,9 @@ def main():
     parser.add_argument("--model_dir", type=str, help="Directory of the feature detector that should be loaded.")
     parser.add_argument("--freeze", type=bool, default=False, help="Freeze weights of the feature detector.")
     parser.add_argument("--transfer_train_p", type=float, default=1.0, help="Use less train examples.")
-    parser.add_argument("--with_color", type=bool, default=False, help="Use color in training.")
     args = parser.parse_args()
 
-    p_dim = 3
-    if args.with_color:
-        p_dim = 6
+    p_dim = 9
     seed = args.seed
     batch_size = args.batch_size
     learning_rate = args.learning_rate
@@ -169,7 +175,7 @@ def main():
     max_epoch = args.max_epoch
 
     # prepare containers to store the batches
-    b, l = load_block(block_dir, 0, spatial_only=not args.with_color)
+    b, l = load_block(block_dir, 0, spatial_only=False)
     blocks = np.zeros((batch_size, ) + b.shape, np.float32)
     labels = np.zeros((batch_size, ) + (l.shape[0], ), np.uint8)
     t_blocks = np.zeros((batch_size, ) + b.shape, np.float32)
@@ -228,7 +234,7 @@ def main():
             ious = []
 
             for i in range(n_t_batches): # execute n_t_batches test steps
-                t_blocks, t_labels = load_batch(i, test_idxs, block_dir, t_blocks, t_labels, batch_size, spatial_only=not args.with_color)
+                t_blocks, t_labels = load_batch(i, test_idxs, block_dir, t_blocks, t_labels, batch_size, spatial_only=False)
                 t, pred = net(t_blocks, training=False)
                 pred = tf.nn.softmax(pred)
                 pred = pred.numpy()
@@ -258,7 +264,7 @@ def main():
             net.save(directory="./models/" + args.dataset, filename="pointnet_" + current_time, net_only=False)
         for i in range(n_batches): # execute n_batches train steps
             with tf.GradientTape() as tape:
-                blocks, labels = load_batch(i, train_idxs, block_dir, blocks, labels, batch_size, apply_random_rotation=True, spatial_only=not args.with_color)
+                blocks, labels = load_batch(i, train_idxs, block_dir, blocks, labels, batch_size, apply_random_rotation=True, spatial_only=False)
                 t, pred = net(blocks, training=True)
                 loss, seg_loss, mat_diff_loss = get_loss(seg_pred=pred, seg=labels, t=t)
                 # loss: The overall loss that contains the seg_loss and the mat_diff_loss
