@@ -10,7 +10,7 @@ from sesa_pointnet import SeSaPointNet
 from tqdm import tqdm
 
 
-def get_loss(seg_pred, seg, t, reg_f=1e-3, check_numerics=True):
+def get_loss(seg_pred, seg, t=None, reg_f=1e-3, check_numerics=True):
     # loss calculation
     seg = seg.astype(np.int32)
     ce = tf.nn.sparse_softmax_cross_entropy_with_logits(
@@ -21,14 +21,17 @@ def get_loss(seg_pred, seg, t, reg_f=1e-3, check_numerics=True):
     per_instance_seg_loss = tf.reduce_mean(ce, axis=1)
     seg_loss = tf.reduce_mean(per_instance_seg_loss)
 
-    K = tf.shape(t)[1]
-    mul = tf.matmul(t, tf.transpose(t, perm=[0,2,1]))
-    mat_diff = mul - tf.constant(np.eye(K), dtype=tf.float32)
-    mat_diff_loss = tf.nn.l2_loss(mat_diff)
-    if check_numerics:
-        mat_diff_loss = tf.debugging.check_numerics(mat_diff_loss, "mat_diff_loss")
+    total = seg_loss
+    mat_diff_loss = None
+    if t is not None:
+        K = tf.shape(t)[1]
+        mul = tf.matmul(t, tf.transpose(t, perm=[0,2,1]))
+        mat_diff = mul - tf.constant(np.eye(K), dtype=tf.float32)
+        mat_diff_loss = tf.nn.l2_loss(mat_diff)
+        if check_numerics:
+            mat_diff_loss = tf.debugging.check_numerics(mat_diff_loss, "mat_diff_loss")
 
-    total = seg_loss + mat_diff_loss * reg_f
+        total = seg_loss + mat_diff_loss * reg_f
     return total, seg_loss, mat_diff_loss
 
 
@@ -266,7 +269,7 @@ def main():
 
             for i in range(n_t_batches): # execute n_t_batches test steps
                 t_blocks, t_labels = load_batch(i, test_idxs, block_dir, t_blocks, t_labels, batch_size, spatial_only=False)
-                t, pred = net(t_blocks, training=False)
+                pred = net(t_blocks, training=False)
                 pred = tf.nn.softmax(pred)
                 pred = pred.numpy()
                 pred = np.argmax(pred, axis=-1)
@@ -296,8 +299,8 @@ def main():
         for i in range(n_batches): # execute n_batches train steps
             with tf.GradientTape() as tape:
                 blocks, labels = load_batch(i, train_idxs, block_dir, blocks, labels, batch_size, apply_random_rotation=False, spatial_only=False)
-                t, pred = net(blocks, training=True)
-                loss, seg_loss, mat_diff_loss = get_loss(seg_pred=pred, seg=labels, t=t)
+                pred = net(blocks, training=True)
+                loss, seg_loss, _ = get_loss(seg_pred=pred, seg=labels)
                 # loss: The overall loss that contains the seg_loss and the mat_diff_loss
                 # seg_loss: Cross entropy loss for the semantic segmentation
                 # mat_diff_loss: Loss of the T-Net which part of the PointNet feature exrtactor

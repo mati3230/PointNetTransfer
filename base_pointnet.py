@@ -312,3 +312,132 @@ class PointNet(BaseNet):
             vars_.extend(self.c4g.non_trainable_weights)
             vars_.extend(self.c5g.non_trainable_weights)
         return vars_
+
+
+class SemSegPointNet(BaseNet):
+    def __init__(
+            self,
+            name,
+            trainable=True,
+            seed=None,
+            check_numerics=False,
+            initializer="glorot_uniform",
+            n_points=4096,
+            p_dim=3
+            ):
+        super().__init__(
+            name=name,
+            trainable=trainable,
+            seed=seed,
+            check_numerics=check_numerics,
+            initializer=initializer)
+        self.n_points = n_points
+        self.p_dim = p_dim
+
+        self.bn1g = BatchNormalization(name=name+"/bn1g")
+        self.bn2g = BatchNormalization(name=name+"/bn2g")
+        self.bn3g = BatchNormalization(name=name+"/bn3g")
+        self.bn4g = BatchNormalization(name=name+"/bn4g")
+        self.bn5g = BatchNormalization(name=name+"/bn5g")
+
+        self.c1g = Conv2D(
+            filters=64,
+            kernel_size=[1, self.p_dim],
+            activation="relu",
+            name=name+"/c1g",
+            trainable=trainable,
+            kernel_initializer=initializer)
+        self.c2g = Conv1D(
+            filters=64,
+            kernel_size=1,
+            activation="relu",
+            name=name+"/c2g",
+            trainable=trainable,
+            kernel_initializer=initializer)
+
+        self.c3g = Conv1D(
+            filters=64,
+            kernel_size=1,
+            activation="relu",
+            name=name+"/c3g",
+            trainable=trainable,
+            kernel_initializer=initializer)
+        self.c4g = Conv1D(
+            filters=128,
+            kernel_size=1,
+            activation="relu",
+            name=name+"/c4g",
+            trainable=trainable,
+            kernel_initializer=initializer)
+        self.c5g = Conv1D(
+            filters=1024,
+            kernel_size=1,
+            activation="relu",
+            name=name+"/c5g",
+            trainable=trainable,
+            kernel_initializer=initializer)
+        self.mp1g = MaxPool1D(name=name + "/mp1g", pool_size=self.n_points)
+
+
+    # @tf.function
+    def __call__(self, obs, training):
+        input_points = tf.dtypes.cast(obs, tf.float32)
+        #print(input_points.shape)
+        x = tf.expand_dims(input_points, -1)
+        g = self.c1g(x)
+        g = tf.squeeze(g, axis=2)
+        #print(g.shape)
+        g = self.bn1g(g, training=training)
+        g = self.c2g(g)
+        g = self.bn2g(g, training=training)
+        #print("G", g.shape)
+
+        # print("G", g.shape)
+        g = self.c3g(g)
+        g = self.bn3g(g, training=training)
+        #print(g.shape)
+        g = self.c4g(g)
+        g = self.bn4g(g, training=training)
+        #print(g.shape)
+        g = self.c5g(g)
+        points_feat = self.bn5g(g, training=training)
+        #print(g.shape)
+
+        # global_feature
+        global_feature = self.mp1g(g)
+        #print("D", global_feature.shape)
+        #global_feature = self.d1g(global_feature)
+        #global_feature = self.bn6g(global_feature)
+        #global_feature = tf.squeeze(global_feature, axis=1)
+        if self.check_numerics:
+            global_feature = tf.debugging.check_numerics(global_feature, "global_feature")
+        return points_feat, global_feature
+
+    def reset(self):
+        pass
+
+    def get_vars(self):
+        vars_ = []
+        vars_.extend(self.bn1g.trainable_weights)
+        vars_.extend(self.bn2g.trainable_weights)
+        vars_.extend(self.bn3g.trainable_weights)
+        vars_.extend(self.bn4g.trainable_weights)
+        vars_.extend(self.bn5g.trainable_weights)
+        vars_.extend(self.bn1g.non_trainable_weights)
+        vars_.extend(self.bn2g.non_trainable_weights)
+        vars_.extend(self.bn3g.non_trainable_weights)
+        vars_.extend(self.bn4g.non_trainable_weights)
+        vars_.extend(self.bn5g.non_trainable_weights)
+        if self.trainable:
+            vars_.extend(self.c1g.trainable_weights)
+            vars_.extend(self.c3g.trainable_weights)
+            vars_.extend(self.c2g.trainable_weights)
+            vars_.extend(self.c4g.trainable_weights)
+            vars_.extend(self.c5g.trainable_weights)
+        else:
+            vars_.extend(self.c1g.non_trainable_weights)
+            vars_.extend(self.c3g.non_trainable_weights)
+            vars_.extend(self.c2g.non_trainable_weights)
+            vars_.extend(self.c4g.non_trainable_weights)
+            vars_.extend(self.c5g.non_trainable_weights)
+        return vars_
