@@ -135,6 +135,8 @@ class SeSaPointNet(BaseClassifier):
         x = self.bn2(x, training=training)
         x = self.dp(x, training=training)
         x = self.c3(x)
+        if self.check_numerics:
+            x = tf.debugging.check_numerics(x, "c3")
         return x
 
 

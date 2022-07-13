@@ -300,7 +300,7 @@ def main():
             with tf.GradientTape() as tape:
                 blocks, labels = load_batch(i, train_idxs, block_dir, blocks, labels, batch_size, apply_random_rotation=False, spatial_only=False)
                 pred = net(blocks, training=True)
-                loss, seg_loss, _ = get_loss(seg_pred=pred, seg=labels)
+                loss, seg_loss, _ = get_loss(seg_pred=pred, seg=labels, check_numerics=args.check_numerics)
                 # loss: The overall loss that contains the seg_loss and the mat_diff_loss
                 # seg_loss: Cross entropy loss for the semantic segmentation
                 # mat_diff_loss: Loss of the T-Net which part of the PointNet feature exrtactor
@@ -325,7 +325,7 @@ def main():
             with train_summary_writer.as_default():
                 tf.summary.scalar("train/loss", loss, step=train_step)
                 tf.summary.scalar("train/seg_loss", seg_loss, step=train_step)
-                tf.summary.scalar("train/mat_diff_loss", mat_diff_loss, step=train_step)
+                #tf.summary.scalar("train/mat_diff_loss", mat_diff_loss, step=train_step)
                 tf.summary.scalar("train/global_norm", global_norm, step=train_step)
             train_summary_writer.flush()
             train_step += 1

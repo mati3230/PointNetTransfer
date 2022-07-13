@@ -241,6 +241,7 @@ def point_label_to_obj(input_filename, out_filename, label_color=True, easy_view
 def get_labelled_blocks(scene, dataset, num_points=4096):
     P, labels = load_scene(dataset=dataset, scene=scene)
     labels = labels.reshape(labels.shape[0], )
+    #print(labels)
     #blocks, b_labels, sample_indices = room2blocks(data=P, label=labels, num_point=num_points)
     #blocks, b_labels, sample_indices = room2blocks_plus_normalized(data=P, label=labels, num_points=num_points)
     blocks, b_labels, sample_indices = room2samples_plus_normalized(data=P, label=labels, num_point=num_points)
@@ -548,7 +549,7 @@ def room2samples_plus_normalized(data, label, num_point):
     new_data_batch[:, :, 3:6] = data_batch[:, :, 3:6]
     if wo_label:
         return new_data_batch, sample_indices
-    return new_data_batch, sample_indices, label_batch
+    return new_data_batch, label_batch, sample_indices
 
 
 def room2samples_wrapper_normalized(data_label_filename, num_point):
