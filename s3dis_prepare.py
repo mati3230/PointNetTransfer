@@ -55,6 +55,7 @@ def prepare_scenes(dataset_name):
                     obj_labels[obj_name] = obj_label_nr
                     obj_label_nr += 1
     print(obj_label_nr-1, "classes found")
+    print(obj_labels)
 
     for dir in os.listdir(s3dis_dir):
         if dir == ".DS_Store":

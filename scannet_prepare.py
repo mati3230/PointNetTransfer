@@ -198,7 +198,8 @@ def sample_scene(pid, scenes, scannet_dir, upsampling, mscannet_dir, special_obj
             if label not in label_dict:
                 label_dict[label] = label_idx
                 label_idx += 1
-    #print("Found {0} labels".format(len(label_dict)))
+    print("Found {0} labels".format(len(label_dict)))
+    print(label_dict)
     for k in range(len(scenes)):
         scene = scenes[k]
         scene_dir = mscannet_dir + "/" + scene
@@ -236,7 +237,8 @@ def sample_scene(pid, scenes, scannet_dir, upsampling, mscannet_dir, special_obj
             partition_vec = np.vstack((partition_vec, tmp_partition_vec))
             label_vec = np.vstack((label_vec, l_vec))
         P = np.asarray(pcd.points)
-        C = 255*np.asarray(pcd.colors)
+        C = np.asarray(pcd.colors)
+        #print("Range of rgb colors: [{0}, {1}]".format(np.min(C), np.max(C)))
         P = np.hstack((P, C))
         xyz_min = np.min(P[:, :3], axis=0)
         P[:, :3] = P[:, :3] - xyz_min

@@ -10,6 +10,21 @@ def load_colors(cpath):
     return colors
 
 
+def render_partition_o3d_cloud(cloud, sp_idxs, colors, w_co=False):
+    vertices = np.asarray(cloud.points)
+    n_vert = vertices.shape[0]
+    rgb = np.zeros((n_vert, 3), dtype=np.float32)
+    for i in range(len(sp_idxs)):
+        sp = sp_idxs[i]
+        color = colors[i]
+        rgb[sp] = color
+    pmesh = o3d.geometry.PointCloud(
+        points=cloud.points)
+    pmesh.colors = o3d.utility.Vector3dVector(rgb)
+    render_o3d(pmesh, w_co=w_co)
+    return pmesh
+
+
 def render_partition_o3d(mesh, sp_idxs, colors, w_co=False):
     vertices = np.asarray(mesh.vertices)
     n_vert = vertices.shape[0]

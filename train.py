@@ -7,6 +7,7 @@ import os
 #from scipy.spatial.transform import Rotation as R
 from sesa_pointnet import SeSaPointNet
 # from utils import render_point_cloud
+from tqdm import tqdm
 
 
 def get_loss(seg_pred, seg, t, reg_f=1e-3, check_numerics=True):
@@ -80,7 +81,7 @@ def load_batch(i, train_idxs, block_dir, blocks, labels, batch_size, apply_rando
                     [-sinval, 0, cosval]
                 ])
             block[:, :3] = np.matmul(block[:, :3], rot)
-            block[:, 6:9] = np.matmul(block[:, 6:9], rot)
+            #block[:, 6:9] = np.matmul(block[:, 6:9], rot)
         blocks[k] = block
         labels[k] = b_labels
     return blocks, labels
@@ -131,9 +132,10 @@ def main():
     parser.add_argument("--model_dir", type=str, help="Directory of the feature detector that should be loaded.")
     parser.add_argument("--freeze", type=bool, default=False, help="Freeze weights of the feature detector.")
     parser.add_argument("--transfer_train_p", type=float, default=1.0, help="Use less train examples.")
+    parser.add_argument("--clean_ds", type=bool, default=False, help="Faulty blocks will be deleted.")
     args = parser.parse_args()
 
-    p_dim = 9
+    p_dim = 6
     seed = args.seed
     batch_size = args.batch_size
     learning_rate = args.learning_rate
@@ -151,7 +153,36 @@ def main():
     np.random.seed(seed)
 
     # train test split
-    block_dirs = os.listdir(block_dir)
+    tmp_block_dirs = os.listdir(block_dir)
+    block_dirs = tmp_block_dirs.copy()
+    if args.clean_ds:
+        tmp_block, tmp_b_labels = load_block(block_dir=block_dir, name=1)
+        points_per_block = tmp_block.shape[0]
+        print("We have {0} points per block".format(points_per_block))
+        deleted = 0
+        for i in tqdm(range(len(tmp_block_dirs)), desc="Filter Blocks"):
+            bfile = tmp_block_dirs[i]
+            nr = int(bfile.split(".")[0])
+            try:
+                tmp_block, tmp_b_labels = load_block(block_dir=block_dir, name=nr)
+            except Exception as e:
+                continue
+            if tmp_block.shape[0] != points_per_block or tmp_b_labels.shape[0] != points_per_block:
+                #print("Remove block '{0}' (nr of points in block: {1}, nr of points in block: {2})".format(
+                #    bfile, tmp_block.shape[0], tmp_b_labels.shape[0]))
+                os.remove(block_dir + "/" + bfile)
+                block_dirs.remove(bfile)
+                deleted += 1
+        print("{0} files deleted".format(deleted))
+        for i in tqdm(range(len(block_dirs)), desc="Rename Blocks"):
+            bfile = block_dirs[i]
+            os.rename(block_dir + "/" + bfile, block_dir + "/n" + str(i) + ".npz")
+        block_dirs = os.listdir(block_dir)
+        for i in tqdm(range(len(block_dirs)), desc="Rename Blocks"):
+            bfile = block_dirs[i]
+            os.rename(block_dir + "/" + bfile, block_dir + "/" + str(i) + ".npz")
+        block_dirs = os.listdir(block_dir)
+    #return
     if args.transfer_train_p < 1.0:
         size = math.floor(args.transfer_train_p * len(block_dirs))
         all_idxs = np.arange(size).astype(np.int32)
@@ -264,7 +295,7 @@ def main():
             net.save(directory="./models/" + args.dataset, filename="pointnet_" + current_time, net_only=False)
         for i in range(n_batches): # execute n_batches train steps
             with tf.GradientTape() as tape:
-                blocks, labels = load_batch(i, train_idxs, block_dir, blocks, labels, batch_size, apply_random_rotation=True, spatial_only=False)
+                blocks, labels = load_batch(i, train_idxs, block_dir, blocks, labels, batch_size, apply_random_rotation=False, spatial_only=False)
                 t, pred = net(blocks, training=True)
                 loss, seg_loss, mat_diff_loss = get_loss(seg_pred=pred, seg=labels, t=t)
                 # loss: The overall loss that contains the seg_loss and the mat_diff_loss

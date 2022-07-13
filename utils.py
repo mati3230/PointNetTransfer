@@ -242,14 +242,17 @@ def get_labelled_blocks(scene, dataset, num_points=4096):
     P, labels = load_scene(dataset=dataset, scene=scene)
     labels = labels.reshape(labels.shape[0], )
     #blocks, b_labels, sample_indices = room2blocks(data=P, label=labels, num_point=num_points)
-    blocks, b_labels, sample_indices = room2blocks_plus_normalized(data=P, label=labels, num_points=num_points)
+    #blocks, b_labels, sample_indices = room2blocks_plus_normalized(data=P, label=labels, num_points=num_points)
+    blocks, b_labels, sample_indices = room2samples_plus_normalized(data=P, label=labels, num_point=num_points)
     #print(labels.shape)
     #blocks, b_labels, sample_indices = room2samples(data=P, label=labels, sample_num_point=num_points)
     return blocks, b_labels, P, labels, sample_indices
 
 
 def get_blocks(P, num_points=4096):
-    blocks, sample_indices = room2samples(data=P, label=None, sample_num_point=num_points)
+    #blocks, sample_indices = room2samples(data=P, label=None, sample_num_point=num_points)
+    blocks, sample_indices = room2samples_plus_normalized(data=P, label=None, num_point=num_points)
+    #blocks, sample_indices = room2blocks_plus_normalized(data=P, label=None, num_points=num_points)
     return blocks, sample_indices
 
 
@@ -265,7 +268,11 @@ def create_blocks(dataset, num_points=4096):
         blocks, b_labels, _, _, _ = get_labelled_blocks(scene=scene, dataset=dataset, num_points=num_points)
         for k in range(blocks.shape[0]):
             block = blocks[k]
+            #print("min", np.min(block, axis=0))
+            #print("max", np.max(block, axis=0))
             b_label = b_labels[k]
+            if b_label.shape[0] != num_points or block.shape[0] != num_points:
+                continue
             np.savez(block_dir + "/" + str(block_n) + ".npz", block=block, labels=b_label)
             block_n += 1
     print(block_n, "Blocks saved.")
@@ -498,19 +505,26 @@ def room2samples(data, label, sample_num_point):
         return sample_datas, sample_indices_list
     return sample_datas, sample_labels, sample_indices_list
 
-def room2samples_plus_normalized(data_label, num_point):
+def room2samples_plus_normalized(data, label, num_point):
     """ room2sample, with input filename and RGB preprocessing.
         for each block centralize XYZ, add normalized XYZ as 678 channels
     """
-    data = data_label[:,0:6]
-    data[:,3:6] /= 255.0
-    label = data_label[:,-1].astype(np.uint8)
+    # data = data_label[:,0:6]
+    # data[:,3:6] /= 255.0
+    # label = data_label[:,-1].astype(np.uint8)
+    wo_label = label is None
     max_room_x = max(data[:,0])
     max_room_y = max(data[:,1])
     max_room_z = max(data[:,2])
     #print(max_room_x, max_room_y, max_room_z)
-
-    data_batch, label_batch = room2samples(data, label, num_point)
+    
+    #blocks, sample_indices = room2samples(data=P, label=None, sample_num_point=num_points)
+    if wo_label:
+        data_batch, sample_indices = room2samples(data=data, label=None, sample_num_point=num_point)
+    else:
+        data_batch, label_batch, sample_indices = room2samples(
+            data=data, label=label, sample_num_point=num_point)
+    """
     new_data_batch = np.zeros((data_batch.shape[0], num_point, 9))
     for b in range(data_batch.shape[0]):
         new_data_batch[b, :, 6] = data_batch[b, :, 0]/max_room_x
@@ -521,7 +535,20 @@ def room2samples_plus_normalized(data_label, num_point):
         #data_batch[b, :, 0] -= (minx+block_size/2)
         #data_batch[b, :, 1] -= (miny+block_size/2)
     new_data_batch[:, :, 0:6] = data_batch
-    return new_data_batch, label_batch
+    """
+    new_data_batch = np.zeros((data_batch.shape[0], num_point, 6))
+    for b in range(data_batch.shape[0]):
+        new_data_batch[b, :, 0] = data_batch[b, :, 0]/max_room_x
+        new_data_batch[b, :, 1] = data_batch[b, :, 1]/max_room_y
+        new_data_batch[b, :, 2] = data_batch[b, :, 2]/max_room_z
+        #minx = min(data_batch[b, :, 0])
+        #miny = min(data_batch[b, :, 1])
+        #data_batch[b, :, 0] -= (minx+block_size/2)
+        #data_batch[b, :, 1] -= (miny+block_size/2)
+    new_data_batch[:, :, 3:6] = data_batch[:, :, 3:6]
+    if wo_label:
+        return new_data_batch, sample_indices
+    return new_data_batch, sample_indices, label_batch
 
 
 def room2samples_wrapper_normalized(data_label_filename, num_point):
