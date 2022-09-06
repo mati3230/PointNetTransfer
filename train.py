@@ -136,6 +136,7 @@ def main():
     parser.add_argument("--freeze", type=bool, default=False, help="Freeze weights of the feature detector.")
     parser.add_argument("--transfer_train_p", type=float, default=1.0, help="Use less train examples.")
     parser.add_argument("--clean_ds", type=bool, default=False, help="Faulty blocks will be deleted.")
+    parser.add_argument("--k_fold", type=int, default=5, help="Specify k for the k fold cross validation.")
     args = parser.parse_args()
 
     p_dim = 6
@@ -193,13 +194,26 @@ def main():
         all_idxs = np.arange(len(block_dirs)).astype(np.int32)
     if all_idxs.shape[0] < batch_size:
         raise Exception("Batch size ({0}) is greater than the number of training examples ({1}).".format(batch_size, all_idxs.shape[0]))
-    train_p = args.train_p
-    train_n = math.floor(train_p * len(all_idxs))
-    test_n = len(all_idxs) - train_n
-    print("Use {0} blocks for training and {1} blocks for testing".format(train_n, test_n))
-    train_idxs = np.random.choice(all_idxs, size=train_n, replace=False)
-    test_idxs = np.delete(all_idxs, train_idxs)
-    np.random.shuffle(train_idxs)
+    if args.k_fold >= 2:
+        np.random.shuffle(all_idxs)
+        train_p = args.train_p
+        examples_n = len(all_idxs)
+        examples_per_fold = math.floor(examples_n / args.k_fold)
+        examples_n = examples_per_fold * args.k_fold
+        all_idxs = all_idxs[:examples_n]
+        train_n = (args.k_fold - 1) * examples_per_fold
+        test_n = examples_per_fold
+        print("Use {0} blocks for training and {1} blocks for testing".format(train_n, test_n))
+        train_idxs = all_idxs[:train_n]
+        test_idxs = all_idxs[train_n:train_n+test_n]
+    else:
+        train_p = args.train_p
+        train_n = math.floor(train_p * len(all_idxs))
+        test_n = len(all_idxs) - train_n
+        print("Use {0} blocks for training and {1} blocks for testing".format(train_n, test_n))
+        train_idxs = np.random.choice(all_idxs, size=train_n, replace=False)
+        test_idxs = np.delete(all_idxs, train_idxs)
+        np.random.shuffle(train_idxs)
 
     # determine the number of batches
     n_batches = math.floor(train_n / batch_size)
@@ -215,41 +229,42 @@ def main():
     t_blocks = np.zeros((batch_size, ) + b.shape, np.float32)
     t_labels = np.zeros((batch_size, ) + (l.shape[0], ), np.uint8)
 
-    if args.load: # load a pretrained network
-        net = SeSaPointNet(
-            name="SeSaPN",
-            n_classes=n_classes,
-            seed=seed,
-            trainable=True,
-            check_numerics=args.check_numerics,
-            initializer=args.initializer,
-            trainable_net=False,
-            n_points=b.shape[0],
-            p_dim=p_dim)
-        tmp_b = np.array(b, copy=True)
-        tmp_b = np.expand_dims(b, axis=0)
-        net(tmp_b, training=False)
-        net.reset()
-        net.load(directory=args.model_dir, filename=args.model_file, net_only=True)
-        print("model loaded")
-        # get vars from PointNet which is a part of SeSaPointNet
-        ft_net_vars_tmp = net.net.get_vars()
-        ft_net_vars = []
-        var_idxs = None
-        for z in range(len(ft_net_vars_tmp)):
-            ft_net_vars.append(ft_net_vars_tmp[z].name)
-        #print(ft_net_vars)
-    else: # train a network from scratch
-        net = SeSaPointNet(
-            name="SeSaPN",
-            n_classes=n_classes,
-            seed=seed,
-            trainable=True,
-            check_numerics=args.check_numerics,
-            initializer=args.initializer,
-            trainable_net=True,
-            n_points=b.shape[0],
-            p_dim=p_dim)
+    if args.k_fold <= 1:
+        if args.load: # load a pretrained network
+            net = SeSaPointNet(
+                name="SeSaPN",
+                n_classes=n_classes,
+                seed=seed,
+                trainable=True,
+                check_numerics=args.check_numerics,
+                initializer=args.initializer,
+                trainable_net=False,
+                n_points=b.shape[0],
+                p_dim=p_dim)
+            tmp_b = np.array(b, copy=True)
+            tmp_b = np.expand_dims(b, axis=0)
+            net(tmp_b, training=False)
+            net.reset()
+            net.load(directory=args.model_dir, filename=args.model_file, net_only=True)
+            print("model loaded")
+            # get vars from PointNet which is a part of SeSaPointNet
+            ft_net_vars_tmp = net.net.get_vars()
+            ft_net_vars = []
+            var_idxs = None
+            for z in range(len(ft_net_vars_tmp)):
+                ft_net_vars.append(ft_net_vars_tmp[z].name)
+            #print(ft_net_vars)
+        else: # train a network from scratch
+            net = SeSaPointNet(
+                name="SeSaPN",
+                n_classes=n_classes,
+                seed=seed,
+                trainable=True,
+                check_numerics=args.check_numerics,
+                initializer=args.initializer,
+                trainable_net=True,
+                n_points=b.shape[0],
+                p_dim=p_dim)
     # prepare training and logging
     optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
     current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -258,9 +273,101 @@ def main():
     train_step = 0
     test_step = 0
 
-    # training and testing
-    while n_epoch < max_epoch:
-        if n_epoch % test_interval == 0: # test step
+    if args.k_fold >= 2:
+        def get_train_test_idxs(all_idxs, examples_per_fold, k_fold, fold_nr):
+            if fold_nr >= k_fold:
+                fold_nr = 0
+            elif fold_nr < 0:
+                fold_nr = 0
+            start = fold_nr * examples_per_fold
+            stop = start + examples_per_fold
+            test_idxs = np.arange(start, stop, dtype=np.uint32)
+            idxs = np.arange(all_idxs.shape[0], dtype=np.uint32)
+            train_idxs = np.delete(idxs, test_idxs)
+            return train_idxs, test_idxs
+
+        fold_stats = {}
+        fold_stats["overall_acc"] = []
+        fold_stats["mIoU"] = []
+        # n batches should match the number of training examples
+        for fold_nr in range(args.k_fold):
+            train_idxs, test_idxs = get_train_test_idxs(
+                all_idxs=all_idxs, examples_per_fold=examples_per_fold, k_fold=args.k_fold, fold_nr=fold_nr)
+
+            if args.load: # load a pretrained network
+                net = SeSaPointNet(
+                    name="SeSaPN",
+                    n_classes=n_classes,
+                    seed=seed,
+                    trainable=True,
+                    check_numerics=args.check_numerics,
+                    initializer=args.initializer,
+                    trainable_net=False,
+                    n_points=b.shape[0],
+                    p_dim=p_dim)
+                tmp_b = np.array(b, copy=True)
+                tmp_b = np.expand_dims(b, axis=0)
+                net(tmp_b, training=False)
+                net.reset()
+                net.load(directory=args.model_dir, filename=args.model_file, net_only=True)
+                print("model loaded")
+                # get vars from PointNet which is a part of SeSaPointNet
+                ft_net_vars_tmp = net.net.get_vars()
+                ft_net_vars = []
+                var_idxs = None
+                for z in range(len(ft_net_vars_tmp)):
+                    ft_net_vars.append(ft_net_vars_tmp[z].name)
+                #print(ft_net_vars)
+            else: # train a network from scratch
+                net = SeSaPointNet(
+                    name="SeSaPN",
+                    n_classes=n_classes,
+                    seed=seed,
+                    trainable=True,
+                    check_numerics=args.check_numerics,
+                    initializer=args.initializer,
+                    trainable_net=True,
+                    n_points=b.shape[0],
+                    p_dim=p_dim)
+
+            n_epoch = 0
+            while n_epoch < max_epoch:
+                for i in range(n_batches): # execute n_batches train steps
+                    with tf.GradientTape() as tape:
+                        blocks, labels = load_batch(i, train_idxs, block_dir, blocks, labels, batch_size, apply_random_rotation=False, spatial_only=False)
+                        pred = net(blocks, training=True)
+                        loss, seg_loss, _ = get_loss(seg_pred=pred, seg=labels, check_numerics=args.check_numerics)
+                        # loss: The overall loss that contains the seg_loss and the mat_diff_loss
+                        # seg_loss: Cross entropy loss for the semantic segmentation
+                        # mat_diff_loss: Loss of the T-Net which part of the PointNet feature exrtactor
+
+                        # get the variables and gradients
+                        vars_ = tape.watched_variables()
+                        grads = tape.gradient(loss, vars_)
+
+                        if args.freeze: # skip the weigths of the PointNet feature extractor  
+                            vars_, grads = freeze(vars_=vars_, grads=grads, var_idxs=var_idxs, ft_net_vars=ft_net_vars)
+
+                        # Threshold operation on the gradients 
+                        global_norm = tf.linalg.global_norm(grads)
+                        if global_norm_t > 0:
+                            grads, _ = tf.clip_by_global_norm(
+                                grads,
+                                global_norm_t,
+                                use_norm=global_norm)
+                        # Weight update
+                        optimizer.apply_gradients(zip(grads, vars_))
+                    # log tensorboard
+                    with train_summary_writer.as_default():
+                        tf.summary.scalar("train/loss", loss, step=train_step)
+                        tf.summary.scalar("train/seg_loss", seg_loss, step=train_step)
+                        #tf.summary.scalar("train/mat_diff_loss", mat_diff_loss, step=train_step)
+                        tf.summary.scalar("train/global_norm", global_norm, step=train_step)
+                    train_summary_writer.flush()
+                    train_step += 1
+                n_epoch += 1
+            
+            # test step
             accs = []
             # number of accuracy calculations in the test phase
             n_acc = t_labels.shape[0] * t_labels.shape[1] * n_t_batches
@@ -289,47 +396,107 @@ def main():
             # log tensorboard
             with train_summary_writer.as_default():
                 # log the average statistics
-                tf.summary.scalar("test/overall_acc", np.sum(accs), step=test_step)
-                tf.summary.scalar("test/mIoU", np.mean(ious), step=test_step)
+                overall_acc = np.sum(accs)
+                mIoU = np.mean(ious)
+                tf.summary.scalar("test/overall_acc", overall_acc, step=test_step)
+                tf.summary.scalar("test/mIoU", mIoU, step=test_step)
+                fold_stats["overall_acc"].append(overall_acc)
+                fold_stats["mIoU"].append(mIoU)
             train_summary_writer.flush()
             test_step += 1
             
             current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
             net.save(directory="./models/" + args.dataset, filename="pointnet_" + current_time, net_only=False)
-        for i in range(n_batches): # execute n_batches train steps
-            with tf.GradientTape() as tape:
-                blocks, labels = load_batch(i, train_idxs, block_dir, blocks, labels, batch_size, apply_random_rotation=False, spatial_only=False)
-                pred = net(blocks, training=True)
-                loss, seg_loss, _ = get_loss(seg_pred=pred, seg=labels, check_numerics=args.check_numerics)
-                # loss: The overall loss that contains the seg_loss and the mat_diff_loss
-                # seg_loss: Cross entropy loss for the semantic segmentation
-                # mat_diff_loss: Loss of the T-Net which part of the PointNet feature exrtactor
+        
+        # compute the average stats
+        avg_stats = {}
+        for k, v in fold_stats.items():
+            avg_stats[k] = np.mean(v)
+        # save fold stats
+        results = "Avg Stats\n"
+        for k, v in avg_stats.items():
+            results += str(k) + ": " + str(v) + "\n"
+        results += "Raw Stats\n"
+        for k, v in fold_stats.items():
+            results += str(k) + ": "
+            for i in range(len(v)):
+                results += str(v[i]) + ", "
+            results[-1] = "\n"
+        with open("fold_stats.txt", "w") as f:
+            f.write(results)
+    else:
+        # training and testing
+        while n_epoch < max_epoch:
+            if n_epoch % test_interval == 0: # test step
+                accs = []
+                # number of accuracy calculations in the test phase
+                n_acc = t_labels.shape[0] * t_labels.shape[1] * n_t_batches
+                # intersection over unions (ious)
+                ious = []
 
-                # get the variables and gradients
-                vars_ = tape.watched_variables()
-                grads = tape.gradient(loss, vars_)
+                for i in range(n_t_batches): # execute n_t_batches test steps
+                    t_blocks, t_labels = load_batch(i, test_idxs, block_dir, t_blocks, t_labels, batch_size, spatial_only=False)
+                    pred = net(t_blocks, training=False)
+                    pred = tf.nn.softmax(pred)
+                    pred = pred.numpy()
+                    pred = np.argmax(pred, axis=-1)
+                    acc = 0
+                    for c in range(n_classes): # calculate performance metrics for each class
+                        TP = np.sum((t_labels == c) & (pred == c)) # true positives
+                        FP = np.sum((t_labels != c) & (pred == c)) # false positives
+                        FN = np.sum((t_labels == c) & (pred != c)) # false negatives
 
-                if args.freeze: # skip the weigths of the PointNet feature extractor  
-                    vars_, grads = freeze(vars_=vars_, grads=grads, var_idxs=var_idxs, ft_net_vars=ft_net_vars)
+                        n = TP
+                        d = float(TP + FP + FN + 1e-12)
 
-                # Threshold operation on the gradients 
-                global_norm = tf.linalg.global_norm(grads)
-                if global_norm_t > 0:
-                    grads, _ = tf.clip_by_global_norm(
-                        grads,
-                        global_norm_t,
-                        use_norm=global_norm)
-                # Weight update
-                optimizer.apply_gradients(zip(grads, vars_))
-            # log tensorboard
-            with train_summary_writer.as_default():
-                tf.summary.scalar("train/loss", loss, step=train_step)
-                tf.summary.scalar("train/seg_loss", seg_loss, step=train_step)
-                #tf.summary.scalar("train/mat_diff_loss", mat_diff_loss, step=train_step)
-                tf.summary.scalar("train/global_norm", global_norm, step=train_step)
-            train_summary_writer.flush()
-            train_step += 1
-        n_epoch += 1
+                        iou = np.divide(n, d) # intersection over union (iou)
+                        ious.append(iou)
+                        # average the accuracy
+                        accs.append(TP / n_acc)
+                # log tensorboard
+                with train_summary_writer.as_default():
+                    # log the average statistics
+                    tf.summary.scalar("test/overall_acc", np.sum(accs), step=test_step)
+                    tf.summary.scalar("test/mIoU", np.mean(ious), step=test_step)
+                train_summary_writer.flush()
+                test_step += 1
+                
+                current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+                net.save(directory="./models/" + args.dataset, filename="pointnet_" + current_time, net_only=False)
+            for i in range(n_batches): # execute n_batches train steps
+                with tf.GradientTape() as tape:
+                    blocks, labels = load_batch(i, train_idxs, block_dir, blocks, labels, batch_size, apply_random_rotation=False, spatial_only=False)
+                    pred = net(blocks, training=True)
+                    loss, seg_loss, _ = get_loss(seg_pred=pred, seg=labels, check_numerics=args.check_numerics)
+                    # loss: The overall loss that contains the seg_loss and the mat_diff_loss
+                    # seg_loss: Cross entropy loss for the semantic segmentation
+                    # mat_diff_loss: Loss of the T-Net which part of the PointNet feature exrtactor
+
+                    # get the variables and gradients
+                    vars_ = tape.watched_variables()
+                    grads = tape.gradient(loss, vars_)
+
+                    if args.freeze: # skip the weigths of the PointNet feature extractor  
+                        vars_, grads = freeze(vars_=vars_, grads=grads, var_idxs=var_idxs, ft_net_vars=ft_net_vars)
+
+                    # Threshold operation on the gradients 
+                    global_norm = tf.linalg.global_norm(grads)
+                    if global_norm_t > 0:
+                        grads, _ = tf.clip_by_global_norm(
+                            grads,
+                            global_norm_t,
+                            use_norm=global_norm)
+                    # Weight update
+                    optimizer.apply_gradients(zip(grads, vars_))
+                # log tensorboard
+                with train_summary_writer.as_default():
+                    tf.summary.scalar("train/loss", loss, step=train_step)
+                    tf.summary.scalar("train/seg_loss", seg_loss, step=train_step)
+                    #tf.summary.scalar("train/mat_diff_loss", mat_diff_loss, step=train_step)
+                    tf.summary.scalar("train/global_norm", global_norm, step=train_step)
+                train_summary_writer.flush()
+                train_step += 1
+            n_epoch += 1
 
 
 
