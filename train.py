@@ -331,7 +331,9 @@ def main():
                     p_dim=p_dim)
 
             n_epoch = 0
-            while n_epoch < max_epoch:
+            print("Fold {0}/{1}".format(fold_nr+1, args.k_fold))
+            for n_epoch in tqdm(range(max_epoch), desc="Epoch"):
+                #print("epoch {0}/{1}".format(n_epoch+1, max_epoch))
                 for i in range(n_batches): # execute n_batches train steps
                     with tf.GradientTape() as tape:
                         blocks, labels = load_batch(i, train_idxs, block_dir, blocks, labels, batch_size, apply_random_rotation=False, spatial_only=False)
@@ -340,7 +342,6 @@ def main():
                         # loss: The overall loss that contains the seg_loss and the mat_diff_loss
                         # seg_loss: Cross entropy loss for the semantic segmentation
                         # mat_diff_loss: Loss of the T-Net which part of the PointNet feature exrtactor
-
                         # get the variables and gradients
                         vars_ = tape.watched_variables()
                         grads = tape.gradient(loss, vars_)
@@ -365,7 +366,6 @@ def main():
                         tf.summary.scalar("train/global_norm", global_norm, step=train_step)
                     train_summary_writer.flush()
                     train_step += 1
-                n_epoch += 1
             
             # test step
             accs = []
@@ -404,7 +404,7 @@ def main():
                 fold_stats["mIoU"].append(mIoU)
             train_summary_writer.flush()
             test_step += 1
-            
+            #print("test", test_step)
             current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
             net.save(directory="./models/" + args.dataset, filename="pointnet_" + current_time, net_only=False)
         
@@ -421,7 +421,7 @@ def main():
             results += str(k) + ": "
             for i in range(len(v)):
                 results += str(v[i]) + ", "
-            results[-1] = "\n"
+            results += "\n"
         with open("fold_stats.txt", "w") as f:
             f.write(results)
     else:
