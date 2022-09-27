@@ -22,7 +22,7 @@ def get_special_objects():
     return special_objects
 
 
-def prepare_scenes(dataset_name):
+def prepare_scenes(dataset_name, random_sample=1):
     """Method to prepare the scenes.
 
     Parameters
@@ -121,6 +121,17 @@ def prepare_scenes(dataset_name):
                 #print(P.shape)
                 label_vec = label_vec[sortation]
                 partition_vec = partition_vec[sortation]
+
+                if random_sample > 0 and random_sample < 1:
+                    print(P.shape[0])
+                    size = random_sample * P.shape[0]
+                    idxs = np.arange(P.shape[0])
+                    idxs = np.choice(a=idxs, size=size, replace=False)
+                    P = P[idxs]
+                    print(P.shape[0])
+                    print("")
+                    label_vec = label_vec[idxs]
+                    partition_vec = partition_vec[idxs]
                 #print(partition_vec.shape)
                 partition_uni, partition_idxs, partition_counts = np.unique(partition_vec, return_index=True, return_counts=True)
                 #print(partition_uni)
@@ -156,6 +167,11 @@ def main():
         type=int,
         default=0,
         help="Number of blocks per batch")
+    parser.add_argument(
+        "--random_sample",
+        type=float,
+        default=1,
+        help="Choose a number between 0 and 1 in order to apply a random sampling of the point clouds")
     args = parser.parse_args()
     print(args)
     print("mode:", args.mode)
@@ -169,7 +185,7 @@ def main():
     elif args.mode == "blocks":
         create_blocks(dataset="S3DIS", num_points=args.num_points, batch_size=args.batch_size)
     else:
-        prepare_scenes("s3dis")
+        prepare_scenes("s3dis", random_sample=args.random_sample)
         if args.mode != "visualize_all":
             return
         scenes = os.listdir("./Scenes/S3DIS")
