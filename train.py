@@ -218,7 +218,7 @@ def main():
     if args.k_fold >= 2:
         np.random.shuffle(all_idxs)
         train_p = args.train_p
-        examples_n = len(all_idxs)
+        examples_n = math.floor(train_p * len(all_idxs))
         examples_per_fold = math.floor(examples_n / args.k_fold)
         examples_n = examples_per_fold * args.k_fold
         all_idxs = all_idxs[:examples_n]
