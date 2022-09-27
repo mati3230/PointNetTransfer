@@ -215,6 +215,7 @@ def main():
         all_idxs = np.arange(len(block_dirs)).astype(np.int32)
     if all_idxs.shape[0] < batch_size:
         raise Exception("Batch size ({0}) is greater than the number of training examples ({1}).".format(batch_size, all_idxs.shape[0]))
+    np.random.shuffle(all_idxs)
     if args.k_fold >= 2:
         np.random.shuffle(all_idxs)
         train_p = args.train_p
