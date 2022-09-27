@@ -3,6 +3,7 @@ import os
 import numpy as np
 from tqdm import tqdm
 from utils import mkdir, file_exists, render_point_cloud, create_blocks, load_scene
+import math
 
 
 def get_special_objects():
@@ -123,13 +124,13 @@ def prepare_scenes(dataset_name, random_sample=1):
                 partition_vec = partition_vec[sortation]
 
                 if random_sample > 0 and random_sample < 1:
-                    print(P.shape[0])
-                    size = random_sample * P.shape[0]
+                    #print(P.shape[0])
+                    size = math.floor(random_sample * P.shape[0])
                     idxs = np.arange(P.shape[0])
-                    idxs = np.choice(a=idxs, size=size, replace=False)
+                    idxs = np.random.choice(a=idxs, size=size, replace=False)
                     P = P[idxs]
-                    print(P.shape[0])
-                    print("")
+                    #print(P.shape[0])
+                    #print("")
                     label_vec = label_vec[idxs]
                     partition_vec = partition_vec[idxs]
                 #print(partition_vec.shape)
