@@ -93,6 +93,7 @@ def load_batch(i, train_idxs, block_dir, blocks, labels, batch_size, apply_rando
 def load_batch2(i, train_idxs, block_dir, blocks, labels, batch_size, apply_random_rotation=False, spatial_only=False):
     name = train_idxs[i]
     blocks, labels = load_block(block_dir, name, spatial_only=spatial_only)
+    labels = np.squeeze(labels, -1)
     if apply_random_rotation:
         for j in range(blocks.shape[0]):
             block = blocks[j]
@@ -235,9 +236,13 @@ def main():
         test_idxs = np.delete(all_idxs, train_idxs)
         np.random.shuffle(train_idxs)
 
-    # determine the number of batches
-    n_batches = math.floor(train_n / batch_size)
-    n_t_batches = math.floor(test_n / batch_size)
+    if args.pre_batched:
+        n_batches = train_n
+        n_t_batches = test_n
+    else:
+        # determine the number of batches
+        n_batches = math.floor(train_n / batch_size)
+        n_t_batches = math.floor(test_n / batch_size)
 
     n_epoch = 0
     max_epoch = args.max_epoch
