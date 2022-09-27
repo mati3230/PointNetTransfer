@@ -339,6 +339,11 @@ def main():
         type=int,
         default=4096,
         help="Number of points per block")
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=0,
+        help="Number of blocks per batch")
     args = parser.parse_args()
 
     scannet_dir = os.environ["SCANNET_DIR"] + "/scans"
@@ -384,7 +389,7 @@ def main():
         sample_scene(0, scenes, scannet_dir, args.upsampling, mscannet_dir, special_objects)
         return
     elif args.mode == "blocks":
-        create_blocks(dataset="Scannet", num_points=args.num_points)
+        create_blocks(dataset="Scannet", num_points=args.num_points, batch_size=args.batch_size)
     if args.mode == "visualize_all":
         for k in range(len(scenes)):
             scene = scenes[k]

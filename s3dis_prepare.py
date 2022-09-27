@@ -151,6 +151,11 @@ def main():
         type=int,
         default=4096,
         help="Number of points per block")
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=0,
+        help="Number of blocks per batch")
     args = parser.parse_args()
     print(args)
     print("mode:", args.mode)
@@ -162,7 +167,7 @@ def main():
         render_point_cloud(
             P=P, partition_vec=labels, animate=args.animate)
     elif args.mode == "blocks":
-        create_blocks(dataset="S3DIS", num_points=args.num_points)
+        create_blocks(dataset="S3DIS", num_points=args.num_points, batch_size=args.batch_size)
     else:
         prepare_scenes("s3dis")
         if args.mode != "visualize_all":

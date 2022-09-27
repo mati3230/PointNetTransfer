@@ -90,6 +90,25 @@ def load_batch(i, train_idxs, block_dir, blocks, labels, batch_size, apply_rando
     return blocks, labels
 
 
+def load_batch2(i, train_idxs, block_dir, blocks, labels, batch_size, apply_random_rotation=False, spatial_only=False):
+    name = train_idxs[i]
+    blocks, labels = load_block(block_dir, name, spatial_only=spatial_only)
+    if apply_random_rotation:
+        for j in range(blocks.shape[0]):
+            block = blocks[j]
+            #rot = R.random().as_matrix()
+            rotation_angle = np.random.uniform() * 2 * np.pi
+            cosval = np.cos(rotation_angle)
+            sinval = np.sin(rotation_angle)
+            rot = np.array([
+                    [cosval, 0, sinval],
+                    [0, 1, 0],
+                    [-sinval, 0, cosval]
+                ])
+            blocks[j, :, :3] = np.matmul(blocks[j, :, :3], rot)
+    return blocks, labels
+
+
 def update_stats(stat_vec, t_uni):
     unis, counts = np.unique(t_uni, return_counts=True)
     stat_vec[unis] += counts
@@ -137,6 +156,7 @@ def main():
     parser.add_argument("--transfer_train_p", type=float, default=1.0, help="Use less train examples.")
     parser.add_argument("--clean_ds", type=bool, default=False, help="Faulty blocks will be deleted.")
     parser.add_argument("--k_fold", type=int, default=5, help="Specify k for the k fold cross validation.")
+    parser.add_argument("--pre_batched", type=bool, default=False, help="Are the examples stored as batches?")
     args = parser.parse_args()
 
     p_dim = 6
@@ -273,6 +293,10 @@ def main():
     train_step = 0
     test_step = 0
 
+    load_batch_func = load_batch
+    if args.pre_batched:
+        load_batch_func = load_batch2
+
     if args.k_fold >= 2:
         def get_train_test_idxs(all_idxs, examples_per_fold, k_fold, fold_nr):
             if fold_nr >= k_fold:
@@ -336,7 +360,7 @@ def main():
                 #print("epoch {0}/{1}".format(n_epoch+1, max_epoch))
                 for i in range(n_batches): # execute n_batches train steps
                     with tf.GradientTape() as tape:
-                        blocks, labels = load_batch(i, train_idxs, block_dir, blocks, labels, batch_size, apply_random_rotation=False, spatial_only=False)
+                        blocks, labels = load_batch_func(i, train_idxs, block_dir, blocks, labels, batch_size, apply_random_rotation=False, spatial_only=False)
                         pred = net(blocks, training=True)
                         loss, seg_loss, _ = get_loss(seg_pred=pred, seg=labels, check_numerics=args.check_numerics)
                         # loss: The overall loss that contains the seg_loss and the mat_diff_loss
@@ -375,7 +399,7 @@ def main():
             ious = []
 
             for i in range(n_t_batches): # execute n_t_batches test steps
-                t_blocks, t_labels = load_batch(i, test_idxs, block_dir, t_blocks, t_labels, batch_size, spatial_only=False)
+                t_blocks, t_labels = load_batch_func(i, test_idxs, block_dir, t_blocks, t_labels, batch_size, spatial_only=False)
                 pred = net(t_blocks, training=False)
                 pred = tf.nn.softmax(pred)
                 pred = pred.numpy()
@@ -435,7 +459,7 @@ def main():
                 ious = []
 
                 for i in range(n_t_batches): # execute n_t_batches test steps
-                    t_blocks, t_labels = load_batch(i, test_idxs, block_dir, t_blocks, t_labels, batch_size, spatial_only=False)
+                    t_blocks, t_labels = load_batch_func(i, test_idxs, block_dir, t_blocks, t_labels, batch_size, spatial_only=False)
                     pred = net(t_blocks, training=False)
                     pred = tf.nn.softmax(pred)
                     pred = pred.numpy()
@@ -465,7 +489,7 @@ def main():
                 net.save(directory="./models/" + args.dataset, filename="pointnet_" + current_time, net_only=False)
             for i in range(n_batches): # execute n_batches train steps
                 with tf.GradientTape() as tape:
-                    blocks, labels = load_batch(i, train_idxs, block_dir, blocks, labels, batch_size, apply_random_rotation=False, spatial_only=False)
+                    blocks, labels = load_batch_func(i, train_idxs, block_dir, blocks, labels, batch_size, apply_random_rotation=False, spatial_only=False)
                     pred = net(blocks, training=True)
                     loss, seg_loss, _ = get_loss(seg_pred=pred, seg=labels, check_numerics=args.check_numerics)
                     # loss: The overall loss that contains the seg_loss and the mat_diff_loss

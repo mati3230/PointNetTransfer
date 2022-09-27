@@ -2,6 +2,7 @@ import os
 import numpy as np
 import glob
 import open3d as o3d
+import math
 from tqdm import tqdm
 
 
@@ -257,7 +258,7 @@ def get_blocks(P, num_points=4096):
     return blocks, sample_indices
 
 
-def create_blocks(dataset, num_points=4096):
+def create_blocks(dataset, num_points=4096, batch_size=-1):
     block_dir = "./Blocks/" + dataset
     mkdir(block_dir)
     scenes = os.listdir("./Scenes/" + dataset)
@@ -267,15 +268,35 @@ def create_blocks(dataset, num_points=4096):
         #P, labels = load_scene(dataset=dataset, scene=scene)
         #blocks, b_labels = room2blocks(data=P, label=labels, num_point=num_points)
         blocks, b_labels, _, _, _ = get_labelled_blocks(scene=scene, dataset=dataset, num_points=num_points)
-        for k in range(blocks.shape[0]):
-            block = blocks[k]
-            #print("min", np.min(block, axis=0))
-            #print("max", np.max(block, axis=0))
-            b_label = b_labels[k]
-            if b_label.shape[0] != num_points or block.shape[0] != num_points:
-                continue
-            np.savez(block_dir + "/" + str(block_n) + ".npz", block=block, labels=b_label)
-            block_n += 1
+        if batch_size > 1:
+            n_blocks = blocks.shape[0]
+            n_batches = math.floor(n_blocks / batch_size)
+            for k in range(n_batches):
+                start = k*batch_size
+                stop = start + batch_size
+                batch = blocks[start:stop]
+                batch_labels = b_labels[start:stop]
+                ok = True
+                for j in range(batch_size):
+                    block = batch[j]
+                    b_label = batch_labels[j]
+                    if b_label.shape[0] != num_points or block.shape[0] != num_points:
+                        ok = False
+                        break
+                if not ok:
+                    continue
+                np.savez(block_dir + "/" + str(block_n) + ".npz", block=batch, labels=batch_labels)
+                block_n += 1
+        else:
+            for k in range(blocks.shape[0]):
+                block = blocks[k]
+                #print("min", np.min(block, axis=0))
+                #print("max", np.max(block, axis=0))
+                b_label = b_labels[k]
+                if b_label.shape[0] != num_points or block.shape[0] != num_points:
+                    continue
+                np.savez(block_dir + "/" + str(block_n) + ".npz", block=block, labels=b_label)
+                block_n += 1
     print(block_n, "Blocks saved.")
 
 
