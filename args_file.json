@@ -1,0 +1,13 @@
+{
+    "check_numerics": false,
+    "seed": 42,
+    "initializer": "he_normal",
+    "model_name": "SeSaPointNet",
+    "model_path": "sesa_pointnet",
+    "model_type": "SeSaPointNet",
+    "global_norm": 10.0,
+    "learning_rate": 1e-3,
+    "trainable": true,
+    "trainable_net": true,
+    "p_dim": 6
+}
