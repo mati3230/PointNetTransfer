@@ -4,6 +4,153 @@ import glob
 import open3d as o3d
 import math
 from tqdm import tqdm
+import tensorflow as tf
+
+
+def compose_model_args(dataset, dataset_dir, params):
+    b, _ = load_block(block_dir=dataset_dir, name=0)
+    n_classes = None
+    if dataset == "S3DIS":
+        n_classes = 14
+    elif dataset == "PCG":
+        n_classes = 12
+    elif dataset == "Scannet":
+        n_classes = 524
+    model_args = {
+        "name": params["model_name"],
+        "n_classes": n_classes,
+        "n_points": b.shape[0],
+        "seed": params["seed"],
+        "trainable": params["trainable"],
+        "check_numerics": params["check_numerics"],
+        "initializer": params["initializer"],
+        "trainable_net": params["trainable_net"],
+        "p_dim": params["p_dim"]
+        }
+    return model_args
+
+
+def get_loss(seg_pred, seg, t=None, reg_f=1e-3, check_numerics=True):
+    # loss calculation
+    seg = seg.astype(np.int32)
+    ce = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                    labels=seg, logits=seg_pred)
+    if check_numerics:
+        ce = tf.debugging.check_numerics(ce, "ce")
+
+    per_instance_seg_loss = tf.reduce_mean(ce, axis=1)
+    seg_loss = tf.reduce_mean(per_instance_seg_loss)
+
+    total = seg_loss
+    mat_diff_loss = None
+    if t is not None:
+        K = tf.shape(t)[1]
+        mul = tf.matmul(t, tf.transpose(t, perm=[0,2,1]))
+        mat_diff = mul - tf.constant(np.eye(K), dtype=tf.float32)
+        mat_diff_loss = tf.nn.l2_loss(mat_diff)
+        if check_numerics:
+            mat_diff_loss = tf.debugging.check_numerics(mat_diff_loss, "mat_diff_loss")
+
+        total = seg_loss + mat_diff_loss * reg_f
+    return total, seg_loss, mat_diff_loss
+
+
+def load_folds(dataset_dir, k_fold_dir, train_folds, test_fold):
+    test_fold_fname = k_fold_dir + "/" + str(test_fold) + ".h5"
+    train_folds_fnames = [k_fold_dir + "/" + str(train_fold) + ".h5" for train_fold in train_folds]
+
+    hf_test = h5py.File(test_fold_fname, "r")
+    test_files = list(hf_test["files"])
+    test_files = [ta.decode() for ta in test_files]
+    hf_test.close()
+
+    train_files = []
+    for fname in train_folds_fnames:
+        hf_train = h5py.File(fname, "r")
+        train_f = list(hf_train["files"])
+        train_f = [ta.decode() for ta in train_f]
+        hf_train.close()
+        train_files.extend(train_area)
+
+    train_files = [dataset_dir + "/" + train_file for train_file in train_files]
+    
+    test_files = [dataset_dir + "/" + test_file for test_file in test_files]
+    return train_files, test_files
+
+
+def load_block(block_dir, name, spatial_only=False):
+    # load a block of the point cloud
+    filename = block_dir + "/" + str(name) + ".npz"
+    data = np.load(filename)
+    block = data["block"]
+    b_labels = data["labels"]
+    """
+    # translate into the origin
+    mean_block = np.mean(block[:, :3], axis=0)
+    block[:, :3] -= mean_block
+
+    # uniformly scale to [-1, 1]
+    max_block = np.max(np.abs(block[:, :3]))
+    block[:, :3] /= max_block
+    
+    # scale point colors to [-0.5, 0.5]
+    block[:, 3:] -= 0.5
+    # scale point colors to [-1, 1]
+    block[:, 3:] *= 2
+    """
+    # render_point_cloud(block)
+    if spatial_only:
+        block = block[:, :3]
+
+    return block, b_labels
+
+
+def load_batch(i, train_idxs, block_dir, blocks, labels, batch_size, apply_random_rotation=False, spatial_only=False):
+    # load a batch of blocks and their corresponding labels
+    j = i * batch_size
+    idxs = train_idxs[j:j+batch_size]
+    for k in range(idxs.shape[0]):
+        name = idxs[k]
+        block, b_labels = load_block(block_dir, name, spatial_only=spatial_only)
+        if len(b_labels.shape) == 2:
+            b_labels = np.squeeze(b_labels, -1)
+        elif len(b_labels.shape) > 2:
+            raise Exception("Unexpected shape of labels" + str(b_labels.shape))
+        if apply_random_rotation:
+            #rot = R.random().as_matrix()
+            rotation_angle = np.random.uniform() * 2 * np.pi
+            cosval = np.cos(rotation_angle)
+            sinval = np.sin(rotation_angle)
+            rot = np.array([
+                    [cosval, 0, sinval],
+                    [0, 1, 0],
+                    [-sinval, 0, cosval]
+                ])
+            block[:, :3] = np.matmul(block[:, :3], rot)
+            #block[:, 6:9] = np.matmul(block[:, 6:9], rot)
+        blocks[k] = block
+        labels[k] = b_labels
+    return blocks, labels
+
+
+def load_batch2(i, train_idxs, block_dir, blocks, labels, batch_size, apply_random_rotation=False, spatial_only=False):
+    name = train_idxs[i]
+    blocks, labels = load_block(block_dir, name, spatial_only=spatial_only)
+    labels = np.squeeze(labels, -1)
+    if apply_random_rotation:
+        for j in range(blocks.shape[0]):
+            block = blocks[j]
+            #rot = R.random().as_matrix()
+            rotation_angle = np.random.uniform() * 2 * np.pi
+            cosval = np.cos(rotation_angle)
+            sinval = np.sin(rotation_angle)
+            rot = np.array([
+                    [cosval, 0, sinval],
+                    [0, 1, 0],
+                    [-sinval, 0, cosval]
+                ])
+            blocks[j, :, :3] = np.matmul(blocks[j, :, :3], rot)
+    return blocks, labels
 
 
 def mkdir(directory):

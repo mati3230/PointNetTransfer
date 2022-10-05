@@ -1,0 +1,12 @@
+{
+    "check_numerics": "bool",
+    "seed": "real pos int",
+    "initializer": "str",
+    "model_name": "str",
+    "model_path": "str",
+    "model_type": "str",
+    "global_norm": "real pos float",
+    "learning_rate": "real pos float",
+    "trainable": "bool",
+    "trainable_net": "bool"
+}
