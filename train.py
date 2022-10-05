@@ -437,7 +437,7 @@ def main():
             #print("test", test_step)
             current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
             net.save(directory="./models/" + args.dataset, filename="pointnet_" + current_time, net_only=False)
-        
+            del net
         # compute the average stats
         avg_stats = {}
         for k, v in fold_stats.items():

@@ -60,7 +60,7 @@ class SeSaPointNet(BaseClassifier):
             kernel_initializer=initializer)
         self.d1sesa = Dense(256, activation="relu", name=name+"/d1sesa", trainable=trainable)
         self.d2sesa = Dense(128, activation="relu", name=name+"/d2sesa", trainable=trainable)
-        self.dp = Dropout(rate=0.7)
+        self.dp = Dropout(rate=0.1)
 
     def init_net(
             self,
