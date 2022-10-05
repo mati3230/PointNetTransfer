@@ -4,6 +4,7 @@ import os
 import h5py
 import random
 import math
+import numpy as np
 from optimization.kfold_tf_server import KFoldTFServer
 from optimization.utils import get_type, save_config, load_args_file
 from utils import load_block, compose_model_args, mkdir
@@ -68,6 +69,7 @@ def main():
     block, b_labels = load_block(block_dir=files_dir, name=0)
     print("prepare example with {0} elements".format(b_labels.shape[0]))
     print("prediction")
+    block = np.expand_dims(block, axis=0)
     model(obs=block, training=False)
     print("reset")
     model.reset()
@@ -89,6 +91,8 @@ def main():
         fold_dir = "./Blocks/" + dataset + "_Folds"
 
         n_folds = len(os.listdir(fold_dir))
+        if fold_nr >= k_fold:
+            fold_nr = 0
         fold_file = fold_dir + "/" + str(fold_nr) + ".h5"
         hf = h5py.File(fold_file, "r")
         examples_per_fold = len(list(hf["files"]))

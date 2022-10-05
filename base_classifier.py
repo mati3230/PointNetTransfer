@@ -59,7 +59,7 @@ class BaseClassifier(ABC):
         pass
 
     @abstractmethod
-    def get_vars(self, net_only=False, head_only=False):
+    def get_vars(self, net_only=False, head_only=False, with_non_trainable=False):
         pass
 
     @abstractmethod

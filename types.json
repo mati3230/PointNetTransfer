@@ -1,4 +1,5 @@
 {
+    "batch_size": "real pos int",
     "check_numerics": "bool",
     "seed": "real pos int",
     "initializer": "str",

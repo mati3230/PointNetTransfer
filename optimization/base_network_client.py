@@ -1,7 +1,7 @@
 import socket
 from abc import abstractmethod
 
-from environment.utils import mkdir
+from .utils import mkdir
 from .base_master_process import BaseMasterProcess
 
 class Client(BaseMasterProcess):

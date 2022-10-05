@@ -78,9 +78,9 @@ class SeSaPointNet(BaseClassifier):
             n_points=self.n_points,
             p_dim=self.p_dim)
 
-    def get_vars(self, net_only=False, head_only=False):
+    def get_vars(self, net_only=False, head_only=False, with_non_trainable=False):
         if not head_only:
-            vars_ = self.net.get_vars()
+            vars_ = self.net.get_vars(with_non_trainable=with_non_trainable)
             if net_only:
                 return vars_
         else:
@@ -89,10 +89,11 @@ class SeSaPointNet(BaseClassifier):
         vars_.extend(self.bn2.trainable_weights)
         vars_.extend(self.bn3.trainable_weights)
         vars_.extend(self.bn4.trainable_weights)
-        vars_.extend(self.bn1.non_trainable_weights)
-        vars_.extend(self.bn2.non_trainable_weights)
-        vars_.extend(self.bn3.non_trainable_weights)
-        vars_.extend(self.bn4.non_trainable_weights)
+        if with_non_trainable:
+            vars_.extend(self.bn1.non_trainable_weights)
+            vars_.extend(self.bn2.non_trainable_weights)
+            vars_.extend(self.bn3.non_trainable_weights)
+            vars_.extend(self.bn4.non_trainable_weights)
         if self.trainable:
             vars_.extend(self.c1.trainable_weights)
             vars_.extend(self.c2.trainable_weights)

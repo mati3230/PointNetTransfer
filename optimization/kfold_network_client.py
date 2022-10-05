@@ -6,7 +6,7 @@ from multiprocessing import Value
 from .base_worker_process import BaseWorkerProcess
 from .base_network_client import Client
 from .utils import socket_recv, socket_send, split_examples
-from cpu_utils import divide_work
+from .cpu_utils import divide_work
 
 
 class KFoldWorker(BaseWorkerProcess):

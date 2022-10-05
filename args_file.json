@@ -1,4 +1,5 @@
 {
+    "batch_size": 1,
     "check_numerics": false,
     "seed": 42,
     "initializer": "he_normal",

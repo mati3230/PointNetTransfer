@@ -85,7 +85,7 @@ class BaseNet(ABC):
         self.initializer = initializer
 
     @abstractmethod
-    def get_vars(self):
+    def get_vars(self, with_non_trainable=False):
         """This method should return the neurons of the neural net.
 
         Returns

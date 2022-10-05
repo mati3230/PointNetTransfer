@@ -50,11 +50,12 @@ class KFoldTFWorker(KFoldWorker):
 
     def on_init(self):
         setup_gpu()
-
-        params, _ = load_args_file(args_file=args.args_file, types_file="types.json")
+        print(self.args_file)
+        params, _ = load_args_file(args_file=self.args_file, types_file="types.json")
 
         self.batch_size = params["batch_size"]
         self.seed = params["seed"]
+        self.check_numerics = params["check_numerics"]
         np.random.seed(self.seed)
 
         # calculate the nr of batches
@@ -131,7 +132,7 @@ class KFoldTFWorker(KFoldWorker):
         batch = self.load_batch(i=i, train_idxs=self.test_idxs, dir=self.dataset_dir, 
             files=self.data_files, batch_size=self.batch_size)
         action = self.prediction(batch=batch)
-        action = action.numpy()
+        #action = action.numpy()
         y = batch[1]
         return y, action
 

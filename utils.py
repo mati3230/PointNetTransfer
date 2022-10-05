@@ -5,6 +5,7 @@ import open3d as o3d
 import math
 from tqdm import tqdm
 import tensorflow as tf
+import h5py
 
 
 def compose_model_args(dataset, dataset_dir, params):
@@ -33,6 +34,7 @@ def compose_model_args(dataset, dataset_dir, params):
 def get_loss(seg_pred, seg, t=None, reg_f=1e-3, check_numerics=True):
     # loss calculation
     seg = seg.astype(np.int32)
+    #print(seg.shape, seg_pred.shape)
     ce = tf.nn.sparse_softmax_cross_entropy_with_logits(
                     labels=seg, logits=seg_pred)
     if check_numerics:
@@ -61,20 +63,22 @@ def load_folds(dataset_dir, k_fold_dir, train_folds, test_fold):
 
     hf_test = h5py.File(test_fold_fname, "r")
     test_files = list(hf_test["files"])
-    test_files = [ta.decode() for ta in test_files]
+    try:
+        test_files = [ta.decode() for ta in test_files]
+    except:
+        test_files = [ta for ta in test_files]
     hf_test.close()
 
     train_files = []
     for fname in train_folds_fnames:
         hf_train = h5py.File(fname, "r")
         train_f = list(hf_train["files"])
-        train_f = [ta.decode() for ta in train_f]
+        try:
+            train_f = [ta.decode() for ta in train_f]
+        except:
+            train_f = [ta for ta in train_f]
         hf_train.close()
-        train_files.extend(train_area)
-
-    train_files = [dataset_dir + "/" + train_file for train_file in train_files]
-    
-    test_files = [dataset_dir + "/" + test_file for test_file in test_files]
+        train_files.extend(train_f)
     return train_files, test_files
 
 
@@ -84,24 +88,12 @@ def load_block(block_dir, name, spatial_only=False):
     data = np.load(filename)
     block = data["block"]
     b_labels = data["labels"]
-    """
-    # translate into the origin
-    mean_block = np.mean(block[:, :3], axis=0)
-    block[:, :3] -= mean_block
 
-    # uniformly scale to [-1, 1]
-    max_block = np.max(np.abs(block[:, :3]))
-    block[:, :3] /= max_block
-    
-    # scale point colors to [-0.5, 0.5]
-    block[:, 3:] -= 0.5
-    # scale point colors to [-1, 1]
-    block[:, 3:] *= 2
-    """
     # render_point_cloud(block)
     if spatial_only:
         block = block[:, :3]
-
+    #if len(block.shape) == 2:
+    #    block = np.expand_dims(block, axis=0)
     return block, b_labels
 
 
@@ -150,6 +142,9 @@ def load_batch2(i, train_idxs, block_dir, blocks, labels, batch_size, apply_rand
                     [-sinval, 0, cosval]
                 ])
             blocks[j, :, :3] = np.matmul(blocks[j, :, :3], rot)
+    #if len(blocks.shape) == 2:
+    blocks = np.expand_dims(blocks, axis=0)
+    labels = np.expand_dims(labels, axis=0)
     return blocks, labels
 
 

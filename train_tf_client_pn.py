@@ -59,7 +59,7 @@ class KFoldTFWorkerPN(KFoldTFWorker):
         #print("train")
         pred = self.model(obs=blocks, training=True)
         #labels_ = tf.cast(labels, tf.float32)
-        seg_loss, _, _ = get_loss(seg_pred=pred, seg=labels, check_numerics=self.check_numerics)
+        seg_loss, _, _ = utils.get_loss(seg_pred=pred, seg=labels, check_numerics=self.check_numerics)
         return {
             "loss": seg_loss
             }
@@ -71,11 +71,20 @@ class KFoldTFWorkerPN(KFoldTFWorker):
         f1s = []
         ious = []
         #print("Compute test")
+
+        n_classes = None
+        if self.dataset == "S3DIS":
+            n_classes = 14
+        elif self.dataset == "PCG":
+            n_classes = 12
+        elif self.dataset == "Scannet":
+            n_classes = 524
+
         for i in range(self.n_t_batches):
             #print("File:", self.data_files[self.test_idxs[i]])
-            t_labels, action = self.test_prediction(i=i)
+            t_labels, pred = self.test_prediction(i=i)
             #print(np.unique(action, return_counts=True))
-            n_acc = t_labels.shape[0] * t_labels.shape[1] * n_t_batches
+            n_acc = t_labels.shape[0] * t_labels.shape[1] * self.n_t_batches
             acc = 0
             for c in range(n_classes): # calculate performance metrics for each class
                 TP = np.sum((t_labels == c) & (pred == c)) # true positives
@@ -135,10 +144,11 @@ class KFoldTFWorkerPN(KFoldTFWorker):
 
     def load_batch(self, i, train_idxs, dir, files, batch_size):
         # note that dir=self.dataset_dir
-        return utils.load_batch2(i=i, train_idxs=train_idxs, block_dir=dir, blocks=None,
+        return utils.load_batch2(i=i, train_idxs=train_idxs, block_dir=self.dataset_dir, blocks=None,
             labels=None, batch_size=batch_size)
 
     def load_folds(self, k_fold_dir, train_folds, test_fold):
+        k_fold_dir = self.dataset_dir + "/../" + self.dataset + "_Folds"
         return utils.load_folds(dataset_dir=self.dataset_dir, k_fold_dir=k_fold_dir, train_folds=train_folds, test_fold=test_fold)
 
     def compose_model_args(self, params):
@@ -171,6 +181,7 @@ class KFoldTFClientPN(KFoldTFClient):
             buffer_size=buffer_size)
 
     def load_folds(self, k_fold_dir, train_folds, test_fold):
+        k_fold_dir = self.dataset_dir + "/../" + self.dataset + "_Folds"
         return utils.load_folds(dataset_dir=self.dataset_dir, k_fold_dir=k_fold_dir, train_folds=train_folds, test_fold=test_fold)
 
     def get_worker(self, conn, id, ready_val, lock, train_idxs, test_idxs):

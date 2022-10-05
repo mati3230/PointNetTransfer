@@ -241,7 +241,7 @@ class PointNet(BaseNet):
     def reset(self):
         pass
 
-    def get_vars(self):
+    def get_vars(self, with_non_trainable=False):
         vars_ = []
         vars_.extend(self.bn1itn.trainable_weights)
         vars_.extend(self.bn2itn.trainable_weights)
@@ -259,22 +259,23 @@ class PointNet(BaseNet):
         vars_.extend(self.bn3g.trainable_weights)
         vars_.extend(self.bn4g.trainable_weights)
         vars_.extend(self.bn5g.trainable_weights)
-        vars_.extend(self.bn1itn.non_trainable_weights)
-        vars_.extend(self.bn2itn.non_trainable_weights)
-        vars_.extend(self.bn3itn.non_trainable_weights)
-        vars_.extend(self.bn4itn.non_trainable_weights)
-        vars_.extend(self.bn5itn.non_trainable_weights)
-        vars_.extend(self.bn1ftn.non_trainable_weights)
-        vars_.extend(self.bn2ftn.non_trainable_weights)
-        vars_.extend(self.bn3ftn.non_trainable_weights)
-        vars_.extend(self.bn4ftn.non_trainable_weights)
-        vars_.extend(self.bn5ftn.non_trainable_weights)
-        vars_.extend(self.bn6ftn.non_trainable_weights)
-        vars_.extend(self.bn1g.non_trainable_weights)
-        vars_.extend(self.bn2g.non_trainable_weights)
-        vars_.extend(self.bn3g.non_trainable_weights)
-        vars_.extend(self.bn4g.non_trainable_weights)
-        vars_.extend(self.bn5g.non_trainable_weights)
+        if with_non_trainable:
+            vars_.extend(self.bn1itn.non_trainable_weights)
+            vars_.extend(self.bn2itn.non_trainable_weights)
+            vars_.extend(self.bn3itn.non_trainable_weights)
+            vars_.extend(self.bn4itn.non_trainable_weights)
+            vars_.extend(self.bn5itn.non_trainable_weights)
+            vars_.extend(self.bn1ftn.non_trainable_weights)
+            vars_.extend(self.bn2ftn.non_trainable_weights)
+            vars_.extend(self.bn3ftn.non_trainable_weights)
+            vars_.extend(self.bn4ftn.non_trainable_weights)
+            vars_.extend(self.bn5ftn.non_trainable_weights)
+            vars_.extend(self.bn6ftn.non_trainable_weights)
+            vars_.extend(self.bn1g.non_trainable_weights)
+            vars_.extend(self.bn2g.non_trainable_weights)
+            vars_.extend(self.bn3g.non_trainable_weights)
+            vars_.extend(self.bn4g.non_trainable_weights)
+            vars_.extend(self.bn5g.non_trainable_weights)
         if self.trainable:
             vars_.extend(self.c1itn.trainable_weights)
             vars_.extend(self.c2itn.trainable_weights)
@@ -416,18 +417,19 @@ class SemSegPointNet(BaseNet):
     def reset(self):
         pass
 
-    def get_vars(self):
+    def get_vars(self, with_non_trainable=False):
         vars_ = []
         vars_.extend(self.bn1g.trainable_weights)
         vars_.extend(self.bn2g.trainable_weights)
         vars_.extend(self.bn3g.trainable_weights)
         vars_.extend(self.bn4g.trainable_weights)
         vars_.extend(self.bn5g.trainable_weights)
-        vars_.extend(self.bn1g.non_trainable_weights)
-        vars_.extend(self.bn2g.non_trainable_weights)
-        vars_.extend(self.bn3g.non_trainable_weights)
-        vars_.extend(self.bn4g.non_trainable_weights)
-        vars_.extend(self.bn5g.non_trainable_weights)
+        if with_non_trainable:
+            vars_.extend(self.bn1g.non_trainable_weights)
+            vars_.extend(self.bn2g.non_trainable_weights)
+            vars_.extend(self.bn3g.non_trainable_weights)
+            vars_.extend(self.bn4g.non_trainable_weights)
+            vars_.extend(self.bn5g.non_trainable_weights)
         if self.trainable:
             vars_.extend(self.c1g.trainable_weights)
             vars_.extend(self.c3g.trainable_weights)
