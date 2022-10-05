@@ -69,7 +69,7 @@ def main():
     block, b_labels = load_block(block_dir=files_dir, name=0)
     print("prepare example with {0} elements".format(b_labels.shape[0]))
     print("prediction")
-    block = np.expand_dims(block, axis=0)
+    #block = np.expand_dims(block, axis=0)
     model(obs=block, training=False)
     print("reset")
     model.reset()

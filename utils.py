@@ -143,8 +143,8 @@ def load_batch2(i, train_idxs, block_dir, blocks, labels, batch_size, apply_rand
                 ])
             blocks[j, :, :3] = np.matmul(blocks[j, :, :3], rot)
     #if len(blocks.shape) == 2:
-    blocks = np.expand_dims(blocks, axis=0)
-    labels = np.expand_dims(labels, axis=0)
+    #blocks = np.expand_dims(blocks, axis=0)
+    #labels = np.expand_dims(labels, axis=0)
     return blocks, labels
 
 
